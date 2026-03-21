@@ -1,10 +1,9 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional, Dict, Any
 
 import bcrypt
 from jose import JWTError, jwt
-from pytz import UTC
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
