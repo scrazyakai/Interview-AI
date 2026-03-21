@@ -171,6 +171,12 @@ button {
   cursor: pointer;
 }
 
+.nav-link-active {
+  background: rgba(255, 255, 255, 0.98);
+  color: #111827;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
 .nav a:hover,
 .nav-link:hover {
   background: rgba(255, 255, 255, 0.96);

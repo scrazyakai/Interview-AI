@@ -13,7 +13,7 @@ from app.config.auth_config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 from app.config.db_config import AsyncSessionLocal
-from app.models.point_records import PointRecordModel
+from app.models.point_record import PointRecordModel
 from app.models.user import UserModel
 
 logger = logging.getLogger(__name__)

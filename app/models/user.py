@@ -6,8 +6,7 @@ from sqlalchemy import text, String, Integer
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, TIMESTAMP
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
 
-class Base(DeclarativeBase):
-    pass
+from app.models.base import Base
 
 
 class UserModel(Base):

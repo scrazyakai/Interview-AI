@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.point_records import PointRecordModel
+from app.models.point_record import PointRecordModel
 from app.schemas import PointRecordResponse
 
 

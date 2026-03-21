@@ -22,6 +22,8 @@ const internalSession = ref<TokenResponse | null>(null)
 
 const currentSession = computed(() => props.session ?? internalSession.value)
 const userInitial = computed(() => currentSession.value?.username.slice(0, 1).toUpperCase() ?? 'U')
+const isHomeRoute = computed(() => route.path === '/')
+const isInterviewRoute = computed(() => route.path.startsWith('/interview'))
 
 function syncSession() {
   internalSession.value = loadAuthSession()
@@ -41,6 +43,10 @@ function toggleUserMenu() {
 
 function goHome() {
   router.push('/')
+}
+
+function goInterview() {
+  router.push('/interview')
 }
 
 function goProfile() {
@@ -116,8 +122,17 @@ onUnmounted(() => {
       </button>
 
       <nav class="nav">
-        <button class="nav-link" type="button" @click="goHome">&#39318;&#39029;</button>
-        <button class="nav-link" type="button" @click="goHome">&#27169;&#25311;&#38754;&#35797;</button>
+        <button class="nav-link" :class="{ 'nav-link-active': isHomeRoute }" type="button" @click="goHome">
+          &#39318;&#39029;
+        </button>
+        <button
+          class="nav-link"
+          :class="{ 'nav-link-active': isInterviewRoute }"
+          type="button"
+          @click="goInterview"
+        >
+          &#27169;&#25311;&#38754;&#35797;
+        </button>
         <button class="nav-link" type="button" @click="goHome">&#31616;&#21382;&#35786;&#26029;</button>
       </nav>
 

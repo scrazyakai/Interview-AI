@@ -178,6 +178,20 @@ function handlePrimaryAction() {
     return
   }
 
+  router.push('/interview')
+}
+
+function handleNavClick(item: string) {
+  if (item === '妯℃嫙闈㈣瘯') {
+    router.push('/interview')
+    return
+  }
+
+  if (item === '棣栭〉') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    return
+  }
+
   document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
 }
 
@@ -257,9 +271,10 @@ async function submitAuthForm() {
       | null
 
     if (!response.ok) {
+      const errorData = data as { detail?: string; message?: string } | null
       authError.value =
-        data?.detail ??
-        data?.message ??
+        errorData?.detail ??
+        errorData?.message ??
         (authMode.value === 'login' ? '登录失败，请稍后重试。' : '注册失败，请稍后重试。')
       return
     }
@@ -304,7 +319,9 @@ onUnmounted(() => {
         </div>
 
         <nav class="nav">
-          <a v-for="item in navItems" :key="item" href="#">{{ item }}</a>
+          <button v-for="item in navItems" :key="item" class="nav-link" type="button" @click="handleNavClick(item)">
+            {{ item }}
+          </button>
         </nav>
 
         <div class="topbar-actions">
@@ -575,7 +592,7 @@ onUnmounted(() => {
               minlength="3"
               maxlength="32"
               pattern="[A-Za-z0-9]+"
-              inputmode="latin"
+              inputmode="text"
               placeholder="请输入英文或数字用户名"
             />
           </label>
