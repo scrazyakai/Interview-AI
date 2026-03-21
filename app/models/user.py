@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
@@ -44,13 +44,13 @@ class UserModel(Base):
         default=None,
     )
 
-    created_at: Mapped[datetime.datetime] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         nullable=False,
         server_default=text("CURRENT_TIMESTAMP"),
     )
 
-    updated_at: Mapped[datetime.datetime] = mapped_column(
+    updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         nullable=False,
         server_default=text("CURRENT_TIMESTAMP"),

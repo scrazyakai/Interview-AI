@@ -7,17 +7,16 @@ from sqlalchemy import ForeignKey, Integer, String, DateTime, Numeric, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 
+from app.models.user import Base
 
-class Base(DeclarativeBase):
-    pass
 
 class PointRecordModel(Base):
     __tablename__ = "point_records"
     __table_args__ = {"schema": "interview"}
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("users.user_id", ondelete="CASCADE"),
+        ForeignKey("interview.users.user_id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="用户ID"

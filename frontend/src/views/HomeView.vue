@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+import {
+  API_BASE_URL,
+  clearAuthSession,
+  loadAuthSession,
+  saveAuthSession,
+  type TokenResponse,
+} from '../utils/auth'
 
 type AuthMode = 'login' | 'register'
 
-type TokenResponse = {
-  access_token: string
-  token_type: string
-  username: string
-}
-
-const API_BASE_URL = 'http://127.0.0.1:8000/api'
-const AUTH_STORAGE_KEY = 'interview-ai-auth'
 const USERNAME_PATTERN = /^[A-Za-z0-9]+$/
+
+const router = useRouter()
 
 const navItems = ['首页', '模拟面试', '简历诊断']
 
@@ -141,6 +144,7 @@ const authLoading = ref(false)
 const authError = ref('')
 const authSuccess = ref('')
 const activeUser = ref<TokenResponse | null>(null)
+const userMenuOpen = ref(false)
 
 const authForm = ref({
   username: '',
@@ -151,13 +155,22 @@ const authTitle = computed(() => (authMode.value === 'login' ? '登录账号' : 
 const authDescription = computed(() =>
   authMode.value === 'login'
     ? '登录后即可开始调用后端认证接口，并保存登录状态。'
-    : '先创建一个账号，再返回登录或直接完成注册登录。 ',
+    : '先创建一个账号，再返回登录或直接完成注册登录。',
 )
 const authSubmitLabel = computed(() => (authMode.value === 'login' ? '登录' : '注册'))
 const authToggleLabel = computed(() =>
   authMode.value === 'login' ? '没有账号？立即注册' : '已有账号？去登录',
 )
 const heroPrimaryLabel = computed(() => (activeUser.value ? '进入训练' : '开始模拟'))
+const userInitial = computed(() => activeUser.value?.username.slice(0, 1).toUpperCase() ?? 'U')
+
+function handleDocumentClick(event: MouseEvent) {
+  const target = event.target
+  if (!(target instanceof HTMLElement)) return
+  if (!target.closest('.user-menu')) {
+    userMenuOpen.value = false
+  }
+}
 
 function handlePrimaryAction() {
   if (!activeUser.value) {
@@ -187,25 +200,23 @@ function toggleAuthMode() {
   authSuccess.value = ''
 }
 
-function saveAuthSession(session: TokenResponse) {
-  activeUser.value = session
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session))
-}
-
-function loadAuthSession() {
-  const raw = localStorage.getItem(AUTH_STORAGE_KEY)
-  if (!raw) return
-
-  try {
-    activeUser.value = JSON.parse(raw) as TokenResponse
-  } catch {
-    localStorage.removeItem(AUTH_STORAGE_KEY)
-  }
+function syncSession() {
+  activeUser.value = loadAuthSession()
 }
 
 function logout() {
+  userMenuOpen.value = false
   activeUser.value = null
-  localStorage.removeItem(AUTH_STORAGE_KEY)
+  clearAuthSession()
+}
+
+function toggleUserMenu() {
+  userMenuOpen.value = !userMenuOpen.value
+}
+
+function goToProfile() {
+  userMenuOpen.value = false
+  router.push('/profile')
 }
 
 async function submitAuthForm() {
@@ -247,12 +258,15 @@ async function submitAuthForm() {
 
     if (!response.ok) {
       authError.value =
-        data?.detail ?? data?.message ?? (authMode.value === 'login' ? '登录失败，请稍后重试。' : '注册失败，请稍后重试。')
+        data?.detail ??
+        data?.message ??
+        (authMode.value === 'login' ? '登录失败，请稍后重试。' : '注册失败，请稍后重试。')
       return
     }
 
     const session = data as TokenResponse
     saveAuthSession(session)
+    syncSession()
     authSuccess.value = authMode.value === 'login' ? '登录成功。' : '注册成功，已为你保存登录状态。'
     authForm.value.password = ''
 
@@ -268,7 +282,12 @@ async function submitAuthForm() {
 }
 
 onMounted(() => {
-  loadAuthSession()
+  syncSession()
+  document.addEventListener('click', handleDocumentClick)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleDocumentClick)
 })
 </script>
 
@@ -290,8 +309,18 @@ onMounted(() => {
 
         <div class="topbar-actions">
           <template v-if="activeUser">
-            <span class="user-pill">{{ activeUser.username }}</span>
-            <button class="ghost-link ghost-button" type="button" @click="logout">退出</button>
+            <div class="user-menu">
+              <button class="avatar-button" type="button" @click.stop="toggleUserMenu">
+                <span class="avatar-circle">{{ userInitial }}</span>
+                <span class="avatar-name">{{ activeUser.username }}</span>
+                <span class="avatar-caret">&#9662;</span>
+              </button>
+
+              <div v-if="userMenuOpen" class="user-dropdown">
+                <button class="dropdown-item" type="button" @click="goToProfile">个人中心</button>
+                <button class="dropdown-item dropdown-item-danger" type="button" @click="logout">退出登录</button>
+              </div>
+            </div>
           </template>
           <template v-else>
             <button class="ghost-link ghost-button" type="button" @click="openAuthDialog('login')">
