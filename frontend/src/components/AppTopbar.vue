@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -46,7 +46,7 @@ function goHome() {
 }
 
 function goInterview() {
-  router.push('/interview')
+  router.push('/interview/setup')
 }
 
 function goProfile() {
@@ -167,3 +167,4 @@ onUnmounted(() => {
     </div>
   </header>
 </template>
+

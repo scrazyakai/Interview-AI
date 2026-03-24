@@ -1,9 +1,13 @@
 from contextlib import suppress
 import traceback
+from urllib.request import Request
+from uuid import UUID
 
-from fastapi import APIRouter, Body, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Body, HTTPException, WebSocket, WebSocketDisconnect, status, Depends
 
+from app.common.dependencies import get_current_user_id
 from app.schemas import InterviewResponse
+from app.schemas.interview import InterviewerInitRequest
 from app.services.interview_service import interview_service
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
@@ -14,14 +18,14 @@ router = APIRouter(prefix="/api/interview", tags=["interview"])
 @router.post("/chat")
 async def chat(message: str = Body(..., embed=True),) -> InterviewResponse:
     try:
-        cleaned_message = message.strip()
+        cleaned_message = message.strip() # 去掉空格
         if not cleaned_message:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="message cannot be empty",
             )
 
-        response = await interview_service.chat(cleaned_message)
+        response = await interview_service.chat(cleaned_message) # 对话
         return InterviewResponse(**response)
     except HTTPException:
         raise
@@ -41,13 +45,13 @@ async def chat(message: str = Body(..., embed=True),) -> InterviewResponse:
 @router.websocket("/ws")
 async def interview_ws(websocket: WebSocket) -> None:
     try:
-        await interview_service.bridge_websocket(websocket)
+        await interview_service.bridge_websocket(websocket) #建立WS连接
     except WebSocketDisconnect:
         return
     except Exception as err:
         traceback.print_exc()
         with suppress(Exception):
-            await websocket.accept()
+            await websocket.accept() #不往外抛出异常
         with suppress(Exception):
             await websocket.send_json(
                 {
@@ -57,3 +61,7 @@ async def interview_ws(websocket: WebSocket) -> None:
             )
         with suppress(Exception):
             await websocket.close(code=1011)
+@router.post("/create-session")
+async def create_session(interview_init: InterviewerInitRequest,user_id: UUID = Depends(get_current_user_id)) -> bool:
+    result =  await interview_service.create_session(interview_init,user_id)
+    return result

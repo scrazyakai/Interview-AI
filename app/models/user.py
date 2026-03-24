@@ -2,9 +2,9 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import text, String, Integer
+from sqlalchemy import text, String, Integer, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, TIMESTAMP
-from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
 
@@ -40,26 +40,23 @@ class UserModel(Base):
     avatar_url: Mapped[Optional[str]] = mapped_column(
         String(255),
         nullable=True,
-        default=None,
     )
 
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         nullable=False,
-        server_default=text("CURRENT_TIMESTAMP"),
+        server_default=func.current_timestamp(),
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP,
         nullable=False,
-        server_default=text("CURRENT_TIMESTAMP"),
-        onupdate=text("CURRENT_TIMESTAMP"),
+        server_default=func.current_timestamp(),
+        onupdate=func.current_timestamp(),
     )
 
     total_points: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
-        default=0,
         server_default=text("0"),
     )
-
