@@ -7,6 +7,15 @@ export type TokenResponse = {
 export const API_BASE_URL = 'http://127.0.0.1:8000/api'
 export const AUTH_STORAGE_KEY = 'interview-ai-auth'
 
+export function getInterviewWebSocketUrl() {
+  const apiUrl = new URL(API_BASE_URL)
+  apiUrl.protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+  apiUrl.pathname = '/api/interview/ws'
+  apiUrl.search = ''
+  apiUrl.hash = ''
+  return apiUrl.toString()
+}
+
 export function loadAuthSession(): TokenResponse | null {
   const raw = localStorage.getItem(AUTH_STORAGE_KEY)
   if (!raw) return null

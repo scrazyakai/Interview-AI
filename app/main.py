@@ -1,5 +1,8 @@
 from fastapi import FastAPI
+from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+
+load_dotenv()
 
 from app.api import auth, interview
 from app.api import user
