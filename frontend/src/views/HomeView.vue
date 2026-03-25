@@ -1,31 +1,11 @@
 ﻿<template>
   <main class="homePage">
-    <header class="topbar">
-      <button class="brand" type="button" @click="scrollToTop">
-        <span class="brandMark">M</span>
-        <span>
-          <strong class="brandTitle">面试起跑线</strong>
-          <small class="brandSubtitle">AI Interview Training</small>
-        </span>
-      </button>
-
-      <nav class="nav">
-        <button class="navLink" type="button" @click="scrollToTop">首页</button>
-        <button class="navLink" type="button" @click="goInterviewSetup">模拟面试</button>
-        <button class="navLink" type="button" @click="scrollToFeatures">功能亮点</button>
-      </nav>
-
-      <div class="topbarActions">
-        <template v-if="activeUser">
-          <button class="ghostButton" type="button" @click="goProfile">个人中心</button>
-          <button class="primaryButton" type="button" @click="logout">退出登录</button>
-        </template>
-        <template v-else>
-          <button class="ghostButton" type="button" @click="openAuthDialog('login')">登录</button>
-          <button class="primaryButton" type="button" @click="openAuthDialog('register')">立即注册</button>
-        </template>
-      </div>
-    </header>
+    <AppTopbar
+      :on-home="true"
+      @login="openAuthDialog('login')"
+      @register="openAuthDialog('register')"
+      @logout="logout"
+    />
 
     <section class="heroSection">
       <div class="heroCopy">
@@ -131,6 +111,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import AppTopbar from '../components/AppTopbar.vue'
 import {
   API_BASE_URL,
   clearAuthSession,
@@ -166,10 +147,6 @@ function syncSession() {
   activeUser.value = loadAuthSession()
 }
 
-function scrollToTop() {
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
 function scrollToFeatures() {
   document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })
 }
@@ -191,10 +168,6 @@ function toggleAuthMode() {
   authMode.value = authMode.value === 'login' ? 'register' : 'login'
   authError.value = ''
   authSuccess.value = ''
-}
-
-function goProfile() {
-  router.push('/profile')
 }
 
 function goInterviewSetup() {
@@ -280,81 +253,6 @@ onMounted(() => {
   background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
   color: #0f172a;
 }
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: min(1200px, calc(100% - 32px));
-  margin: 0 auto;
-  padding: 20px 0;
-}
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-}
-.brandMark {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border-radius: 14px;
-  background: #111827;
-  color: #fff;
-  font-weight: 700;
-}
-.brandTitle,
-.brandSubtitle {
-  display: block;
-}
-.brandSubtitle {
-  color: #64748b;
-  font-size: 12px;
-}
-.nav,
-.topbarActions,
-.heroActions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-.navLink,
-.primaryButton,
-.ghostButton,
-.closeButton,
-.switchButton {
-  border-radius: 999px;
-  font: inherit;
-}
-.navLink,
-.ghostButton,
-.switchButton {
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  color: #0f172a;
-}
-.navLink,
-.ghostButton {
-  min-height: 42px;
-  padding: 0 16px;
-  cursor: pointer;
-}
-.primaryButton {
-  border: 0;
-  background: #111827;
-  color: #fff;
-  min-height: 42px;
-  padding: 0 18px;
-  cursor: pointer;
-}
-.largeButton {
-  min-height: 48px;
-  padding: 0 20px;
-}
 .heroSection,
 .contentSection {
   width: min(1200px, calc(100% - 32px));
@@ -385,6 +283,41 @@ onMounted(() => {
 .authDescription {
   color: #475569;
   line-height: 1.8;
+}
+.heroActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.primaryButton,
+.ghostButton,
+.closeButton,
+.switchButton {
+  border-radius: 999px;
+  font: inherit;
+}
+.ghostButton,
+.switchButton {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+}
+.ghostButton {
+  min-height: 42px;
+  padding: 0 16px;
+  cursor: pointer;
+}
+.primaryButton {
+  border: 0;
+  background: #111827;
+  color: #fff;
+  min-height: 42px;
+  padding: 0 18px;
+  cursor: pointer;
+}
+.largeButton {
+  min-height: 48px;
+  padding: 0 20px;
 }
 .heroPanel,
 .featureCard,
@@ -491,26 +424,18 @@ onMounted(() => {
   cursor: pointer;
 }
 @media (max-width: 900px) {
-  .topbar,
   .heroSection,
   .contentSection {
     width: calc(100% - 24px);
   }
-  .topbar,
   .heroSection,
   .featureGrid {
     grid-template-columns: 1fr;
   }
-  .topbar {
-    flex-direction: column;
-  }
-  .nav,
-  .topbarActions,
   .heroActions {
     width: 100%;
     flex-wrap: wrap;
   }
-  .navLink,
   .primaryButton,
   .ghostButton,
   .largeButton {

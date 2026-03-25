@@ -4,7 +4,10 @@ from typing import Any
 
 from pathlib import Path
 
-from app.schemas import InterviewerInitRequest
+from sqlalchemy import select
+
+from app.config.db_config import AsyncSessionLocal
+from app.models import InterviewSession
 
 DEFAULT_REALTIME_URL = "wss://openspeech.bytedance.com/api/v3/realtime/dialogue"
 DEFAULT_RESOURCE_ID = "volc.speech.dialog"
@@ -36,20 +39,23 @@ def build_realtime_ws_config() -> dict[str, Any]:
     }
 
 
-def build_start_session_payload(input_mod: str = "text") -> dict[str, Any]:
+async def build_start_session_payload(input_mod: str = "text") -> dict[str, Any]:
 
     role_prompt_path = os.getenv("VOLC_REALTIME_SYSTEM_ROLE")
     if not role_prompt_path:
         raise ValueError("Missing VOLC_REALTIME_SYSTEM_ROLE")
+    # 读取模板提示词
     system_role_template = Path(role_prompt_path).read_text(encoding="utf-8").strip()
-    # try:
-    #     system_role = system_role_template.format(job_function=interviewer_init.job_function,
-    #                                               job_title=interviewer_init.job_title,
-    #                                               job_description=interviewer_init.job_description,
-    #                                               experience_level=interviewer_init.experience_level,
-    #                                               interview_round=interviewer_init.interview_round)
-    # except KeyError as exc:
-    #     raise ValueError(f"Prompt template has unknown placeholder: {exc}")
+    async with AsyncSessionLocal() as session:
+        interview = await session.execute(select(InterviewSession)).scalars().first()
+    system_role = system_role_template.format(
+        job_function=interview.job_function,
+        job_title=interview.job_title,
+        job_description=interview.job_description,
+        experience_level=interview.experience_level,
+        mode=interview.mode,
+        resume_text = interview.resume_text
+    )
     return {
         "asr": {
             "extra": {
@@ -66,7 +72,7 @@ def build_start_session_payload(input_mod: str = "text") -> dict[str, Any]:
         },
         "dialog": {
             "bot_name": os.getenv("VOLC_REALTIME_BOT_NAME", "豆生"),
-            "system_role": system_role_template,
+            "system_role": system_role,
             "speaking_style": os.getenv("VOLC_REALTIME_SPEAKING_STYLE", "表达专业、清晰、语速适中。"),
             "extra": {
                 "strict_audit": False,

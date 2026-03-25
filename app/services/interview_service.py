@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from app.common.dependencies import get_current_user_id
 from app.config.db_config import AsyncSessionLocal
 import websockets
-from fastapi import WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
 
 from app.config.interview_config import build_realtime_ws_config, build_start_session_payload
 from app.models import InterviewSession

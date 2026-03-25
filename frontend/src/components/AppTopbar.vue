@@ -5,7 +5,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { loadAuthSession, type TokenResponse } from '../utils/auth'
 
 const props = defineProps<{
-  session?: TokenResponse | null
   onHome?: boolean
 }>()
 
@@ -20,7 +19,7 @@ const route = useRoute()
 const userMenuOpen = ref(false)
 const internalSession = ref<TokenResponse | null>(null)
 
-const currentSession = computed(() => props.session ?? internalSession.value)
+const currentSession = computed(() => internalSession.value)
 const userInitial = computed(() => currentSession.value?.username.slice(0, 1).toUpperCase() ?? 'U')
 const isHomeRoute = computed(() => route.path === '/')
 const isInterviewRoute = computed(() => route.path.startsWith('/interview'))
@@ -78,30 +77,15 @@ function handleLogout() {
 }
 
 watch(
-  () => props.session,
-  (value) => {
-    if (value !== undefined) {
-      internalSession.value = value
-    }
-  },
-  { immediate: true },
-)
-
-watch(
   () => route.fullPath,
   () => {
     userMenuOpen.value = false
-    if (props.session === undefined) {
-      syncSession()
-    }
+    syncSession()
   },
 )
 
 onMounted(() => {
-  if (props.session === undefined) {
-    syncSession()
-  }
-
+  syncSession()
   document.addEventListener('click', handleDocumentClick)
 })
 
@@ -167,4 +151,3 @@ onUnmounted(() => {
     </div>
   </header>
 </template>
-

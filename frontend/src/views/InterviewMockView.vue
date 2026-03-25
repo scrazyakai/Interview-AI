@@ -61,18 +61,6 @@
       </div>
 
       <div class="sidePanel">
-        <div class="infoCard">
-          <div class="cardHeader">
-            <span>本次面试配置</span>
-          </div>
-          <ul class="infoList">
-            <li><strong>岗位：</strong>{{ interviewSetup?.job_title ?? '-' }}</li>
-            <li><strong>经验：</strong>{{ experienceLevelLabel }}</li>
-            <li><strong>模式：</strong>{{ modeLabel }}</li>
-          </ul>
-          <p class="cardHint">{{ interviewSetup?.job_description ?? '' }}</p>
-        </div>
-
         <div class="interviewerCard">
           <div class="cardHeader">
             <span>AI 面试官</span>
@@ -126,6 +114,18 @@
                 : '点击“开启麦克风”后开始本次模拟面试，摄像头仅用于本地预览。'
             }}
           </p>
+        </div>
+
+        <div class="infoCard">
+          <div class="cardHeader">
+            <span>本次面试配置</span>
+          </div>
+          <ul class="infoList">
+            <li><strong>岗位：</strong>{{ interviewSetup?.job_title ?? '-' }}</li>
+            <li><strong>经验：</strong>{{ experienceLevelLabel }}</li>
+            <li><strong>模式：</strong>{{ modeLabel }}</li>
+          </ul>
+          <p class="cardHint">{{ interviewSetup?.job_description ?? '' }}</p>
         </div>
       </div>
     </div>
@@ -593,7 +593,7 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
-  min-height: calc(100vh - 48px);
+  height: 80vh;
   padding: 24px 24px 120px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 28px;
@@ -644,8 +644,10 @@ onBeforeUnmount(() => {
 .avatarCircle { display: grid; width: 110px; height: 110px; place-items: center; overflow: hidden; border: 4px solid #ffffff; border-radius: 50%; background: #ffffff; }
 .cardAvatarImage { width: 100%; height: 100%; object-fit: cover; }
 .cardHint,.cameraHint { margin: 12px 0 0; color: #64748b; font-size: 13px; line-height: 1.6; }
-@media (max-width: 980px) { .mainContainer { flex-direction: column; } .chatSection { min-height: auto; } .sidePanel { width: 100%; } }
+@media (max-width: 980px) { .mainContainer { flex-direction: column; } .chatSection { height: auto; min-height: auto; } .sidePanel { width: 100%; } }
 @media (max-width: 720px) { .mainContainer { width: calc(100% - 24px); margin: 12px auto; padding: 16px; } .chatSection { padding: 18px 18px 112px; } .chatTopbar,.cardActionsRow { flex-direction: column; } .statusGroup { justify-content: flex-start; } .inputBar { right: 18px; bottom: 18px; left: 18px; } .messageBubble { max-width: 100%; } }
 </style>
+
+
 
 

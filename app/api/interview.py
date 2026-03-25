@@ -1,9 +1,9 @@
 from contextlib import suppress
 import traceback
-from urllib.request import Request
 from uuid import UUID
 
-from fastapi import APIRouter, Body, HTTPException, WebSocket, WebSocketDisconnect, status, Depends
+from fastapi import APIRouter, Body, HTTPException, WebSocket, WebSocketDisconnect, status, Depends, UploadFile, File
+from pymupdf import pymupdf
 
 from app.common.dependencies import get_current_user_id
 from app.schemas import InterviewResponse
@@ -65,3 +65,16 @@ async def interview_ws(websocket: WebSocket) -> None:
 async def create_session(interview_init: InterviewerInitRequest,user_id: UUID = Depends(get_current_user_id)) -> bool:
     result =  await interview_service.create_session(interview_init,user_id)
     return result
+@router.post("/upload")
+async def upload_resume(file: UploadFile = File(...)):
+    data = await file.read()
+    # 判断是否为空
+    if not data:
+        raise HTTPException(status_code=400,detail="File is empty")
+    doc = pymupdf.open(stream=data,filetype="pdf")
+    texts = []
+    for page in doc:
+        page_text = page.get_text().strip()
+        if page_text:
+            texts.append(page_text)
+    return {"resume_text": "\n".join(texts)}
