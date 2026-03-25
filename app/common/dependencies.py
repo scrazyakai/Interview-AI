@@ -71,3 +71,21 @@ async def get_optional_user_id(
         return UUID(user_id_str)
     except ValueError:
         return None
+def parse_user_id_from_token(token: str) -> UUID:
+    user_id_str = auth_service.get_user_id_from_token(token)
+
+    if not user_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        return UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID format",
+            headers={"WWW-Authenticate": "Bearer"},
+        )

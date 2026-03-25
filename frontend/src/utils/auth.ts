@@ -10,17 +10,19 @@ export type InterviewSetupPayload = {
   experience_level: string
   mode: string
   resume_text: string
+  session_uuid: string
 }
 
 export const API_BASE_URL = 'http://127.0.0.1:8000/api'
 export const AUTH_STORAGE_KEY = 'interview-ai-auth'
 export const INTERVIEW_SETUP_STORAGE_KEY = 'interview-ai-setup'
 
-export function getInterviewWebSocketUrl() {
+export function getInterviewWebSocketUrl(token: string, sessionUuid: string) {
   const apiUrl = new URL(API_BASE_URL)
   apiUrl.protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:'
   apiUrl.pathname = '/api/interview/ws'
-  apiUrl.search = ''
+  apiUrl.searchParams.set('token', token)
+  apiUrl.searchParams.set('session_uuid', sessionUuid)
   apiUrl.hash = ''
   return apiUrl.toString()
 }

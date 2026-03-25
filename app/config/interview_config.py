@@ -1,12 +1,8 @@
-import os
+﻿import os
 import uuid
+from pathlib import Path
 from typing import Any
 
-from pathlib import Path
-
-from sqlalchemy import select
-
-from app.config.db_config import AsyncSessionLocal
 from app.models import InterviewSession
 
 DEFAULT_REALTIME_URL = "wss://openspeech.bytedance.com/api/v3/realtime/dialogue"
@@ -39,23 +35,25 @@ def build_realtime_ws_config() -> dict[str, Any]:
     }
 
 
-async def build_start_session_payload(input_mod: str = "text") -> dict[str, Any]:
-
+async def build_start_session_payload(
+    interview: InterviewSession | None = None,
+    input_mod: str = "text",
+) -> dict[str, Any]:
     role_prompt_path = os.getenv("VOLC_REALTIME_SYSTEM_ROLE")
     if not role_prompt_path:
         raise ValueError("Missing VOLC_REALTIME_SYSTEM_ROLE")
-    # 读取模板提示词
+
     system_role_template = Path(role_prompt_path).read_text(encoding="utf-8").strip()
-    async with AsyncSessionLocal() as session:
-        interview = await session.execute(select(InterviewSession)).scalars().first()
-    system_role = system_role_template.format(
-        job_function=interview.job_function,
-        job_title=interview.job_title,
-        job_description=interview.job_description,
-        experience_level=interview.experience_level,
-        mode=interview.mode,
-        resume_text = interview.resume_text
-    )
+    interview_data = {
+        "job_function": getattr(interview, "job_function", "") or "",
+        "job_title": getattr(interview, "job_title", "") or "",
+        "job_description": getattr(interview, "job_description", "") or "",
+        "experience_level": getattr(interview, "experience_level", "") or "",
+        "mode": getattr(interview, "mode", "") or "",
+        "resume_text": getattr(interview, "resume_text", "") or "",
+    }
+    system_role = system_role_template.format(**interview_data)
+
     return {
         "asr": {
             "extra": {

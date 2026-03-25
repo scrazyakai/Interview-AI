@@ -106,6 +106,11 @@ import {
   type InterviewSetupPayload,
 } from '../utils/auth'
 
+type CreateSessionResponse = {
+  success: boolean
+  session_uuid: string
+}
+
 const router = useRouter()
 const jobTitleOptions = ['前端', '后端', '测试', '运维', '全栈']
 const experienceLevelOptions = [
@@ -130,6 +135,7 @@ const form = reactive<InterviewSetupPayload>({
   experience_level: defaultExperienceLevel,
   mode: defaultMode,
   resume_text: '',
+  session_uuid: '',
 })
 
 const submitting = ref(false)
@@ -248,7 +254,7 @@ async function submitSetup() {
     })
 
     const data = (await response.json().catch(() => null)) as
-      | boolean
+      | CreateSessionResponse
       | { detail?: string; message?: string }
       | null
 
@@ -258,12 +264,16 @@ async function submitSetup() {
       return
     }
 
+    const responseData = data as CreateSessionResponse | null
+    form.session_uuid = responseData?.session_uuid ?? ''
+
     saveInterviewSetup({
       job_title: form.job_title,
       job_description: form.job_description.trim(),
       experience_level: form.experience_level,
       mode: form.mode,
       resume_text: form.resume_text,
+      session_uuid: form.session_uuid,
     })
 
     successMessage.value = '面试已创建，正在进入面试页面。'

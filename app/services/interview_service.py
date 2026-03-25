@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import base64
 import gzip
 import json
@@ -7,15 +7,12 @@ from contextlib import suppress
 from typing import Any
 from uuid import UUID
 
-from fastapi.params import Depends
-from sqlalchemy import func
+import websockets
+from fastapi import HTTPException, WebSocket, WebSocketDisconnect
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.common.dependencies import get_current_user_id
 from app.config.db_config import AsyncSessionLocal
-import websockets
-from fastapi import WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
-
 from app.config.interview_config import build_realtime_ws_config, build_start_session_payload
 from app.models import InterviewSession
 from app.schemas import InterviewerInitRequest
@@ -30,7 +27,7 @@ MSG_WITH_EVENT = 0b0100
 JSON_SERIALIZATION = 0b0001
 NO_SERIALIZATION = 0b0000
 GZIP_COMPRESSION = 0b0001
-FIRST_RESPONSE_CONTENT = "你好，先做下自我介绍吧"
+FIRST_RESPONSE_CONTENT = "你好，先做下自我介绍吧。"
 
 
 def _generate_header(
@@ -147,7 +144,7 @@ class InterviewService:
     async def chat(self, message: str) -> dict[str, Any]:
         session_id = str(uuid.uuid4())
         ws_config = build_realtime_ws_config()
-        start_session_payload = build_start_session_payload(input_mod="text")
+        start_session_payload = await build_start_session_payload(input_mod="text")
 
         audio_chunks: list[bytes] = []
         text_fragments: list[str] = []
@@ -204,12 +201,27 @@ class InterviewService:
             "audio_sample_rate": start_session_payload["tts"]["audio_config"]["sample_rate"] if audio_bytes else None,
         }
 
-    async def bridge_websocket(self, client_ws: WebSocket) -> None:
-        await client_ws.accept()
+    async def _get_interview_session(self, user_id: UUID, session_uuid: UUID) -> InterviewSession:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(InterviewSession).where(
+                    InterviewSession.user_id == user_id,
+                    InterviewSession.session_uuid == session_uuid,
+                )
+            )
+            interview = result.scalars().first()
+
+        if not interview:
+            raise HTTPException(status_code=404, detail="Interview session not found")
+
+        return interview
+
+    async def bridge_websocket(self, client_ws: WebSocket, user_id: UUID, session_uuid: UUID) -> None:
+        interview = await self._get_interview_session(user_id, session_uuid)
 
         session_id = str(uuid.uuid4())
         ws_config = build_realtime_ws_config()
-        start_session_payload = build_start_session_payload(input_mod="audio")
+        start_session_payload = await build_start_session_payload(interview, input_mod="audio")
 
         async with websockets.connect(
             ws_config["base_url"],
@@ -337,23 +349,28 @@ class InterviewService:
                 await client_ws.send_json({"type": "user_done"})
                 continue
 
-    async def create_session(self, interview_init: InterviewerInitRequest, user_id: UUID) -> bool:
-        # 创建interview-session
-        interview_session = InterviewSession(user_id=user_id
-                                             , job_title=interview_init.job_title
-                                             , job_description=interview_init.job_description
-                                             , resume_text=interview_init.resume_text
-                                             , mode=interview_init.mode
-                                             , experience_level=interview_init.experience_level
-                                             , status="interviewing"
-                                             , started_at=func.now())
+    async def create_session(self, interview_init: InterviewerInitRequest, user_id: UUID) -> dict[str, Any]:
+        interview_session = InterviewSession(
+            user_id=user_id,
+            job_title=interview_init.job_title,
+            job_description=interview_init.job_description,
+            resume_text=interview_init.resume_text,
+            mode=interview_init.mode,
+            experience_level=interview_init.experience_level,
+            status="interviewing",
+            started_at=func.now(),
+        )
         async with AsyncSessionLocal() as session:
-
             try:
                 session.add(interview_session)
                 await session.commit()
-                return True
-            # 初始化状态
-            except IntegrityError:
-                raise HTTPException(status_code=500, detail="Failed to create interview session")
+                await session.refresh(interview_session)
+                return {
+                    "success": True,
+                    "session_uuid": str(interview_session.session_uuid),
+                }
+            except IntegrityError as exc:
+                raise HTTPException(status_code=500, detail="Failed to create interview session") from exc
+
+
 interview_service = InterviewService()

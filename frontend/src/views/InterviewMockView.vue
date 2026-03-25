@@ -139,6 +139,7 @@ import { useRouter } from 'vue-router'
 import AppTopbar from '../components/AppTopbar.vue'
 import {
   clearAuthSession,
+  loadAuthSession,
   loadInterviewSetup,
   getInterviewWebSocketUrl,
 } from '../utils/auth'
@@ -289,7 +290,14 @@ function stopCamera() {
 }
 
 function createRealtimeSocket() {
-  const socket = new WebSocket(getInterviewWebSocketUrl())
+  const authSession = loadAuthSession()
+  const sessionUuid = interviewSetup?.session_uuid?.trim()
+
+  if (!authSession?.access_token || !sessionUuid) {
+    throw new Error('缺少登录态或面试会话信息，请重新创建面试。')
+  }
+
+  const socket = new WebSocket(getInterviewWebSocketUrl(authSession.access_token, sessionUuid))
   socket.binaryType = 'arraybuffer'
   isIntentionalSocketClose = false
 
@@ -647,6 +655,10 @@ onBeforeUnmount(() => {
 @media (max-width: 980px) { .mainContainer { flex-direction: column; } .chatSection { height: auto; min-height: auto; } .sidePanel { width: 100%; } }
 @media (max-width: 720px) { .mainContainer { width: calc(100% - 24px); margin: 12px auto; padding: 16px; } .chatSection { padding: 18px 18px 112px; } .chatTopbar,.cardActionsRow { flex-direction: column; } .statusGroup { justify-content: flex-start; } .inputBar { right: 18px; bottom: 18px; left: 18px; } .messageBubble { max-width: 100%; } }
 </style>
+
+
+
+
 
 
 
