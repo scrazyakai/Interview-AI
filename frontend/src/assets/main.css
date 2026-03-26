@@ -1,3 +1,4 @@
+﻿@import 'tailwindcss';
 @import './base.css';
 
 #app {
@@ -1483,3 +1484,4 @@ button {
     align-items: flex-start;
   }
 }
+

@@ -101,7 +101,7 @@ onUnmounted(() => {
         <div class="brand-mark">M</div>
         <div>
           <p class="brand-name">&#38754;&#35797;&#36215;&#36305;&#32447;</p>
-          <p class="brand-subtitle">AI Interview Training</p>
+          <p class="brand-subtitle">&#26234;&#33021;&#27169;&#25311;&#38754;&#35797;</p>
         </div>
       </button>
 
@@ -117,7 +117,7 @@ onUnmounted(() => {
         >
           &#27169;&#25311;&#38754;&#35797;
         </button>
-        <button class="nav-link" type="button" @click="goHome">&#31616;&#21382;&#35786;&#26029;</button>
+        <button class="nav-link" type="button" @click="goHome">&#20135;&#21697;&#20171;&#32461;</button>
       </nav>
 
       <div class="topbar-actions">
@@ -151,3 +151,4 @@ onUnmounted(() => {
     </div>
   </header>
 </template>
+
