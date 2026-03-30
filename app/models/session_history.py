@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import enum
 import uuid
@@ -50,6 +50,7 @@ class SessionHistory(Base):
     message_source: Mapped[MessageSourceEnum] = mapped_column(
         Enum(
             MessageSourceEnum,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
             name="message_source_enum",
             schema="interview",
             native_enum=True,
