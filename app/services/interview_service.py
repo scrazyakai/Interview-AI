@@ -2,6 +2,7 @@
 import base64
 import gzip
 import json
+import logging
 import uuid
 from contextlib import suppress
 from typing import Any
@@ -28,6 +29,7 @@ JSON_SERIALIZATION = 0b0001
 NO_SERIALIZATION = 0b0000
 GZIP_COMPRESSION = 0b0001
 FIRST_RESPONSE_CONTENT = "你好，先做下自我介绍吧。"
+logger = logging.getLogger(__name__)
 
 
 def _generate_header(
@@ -138,6 +140,79 @@ def _parse_response(raw: Any) -> dict[str, Any]:
         result["payload_msg"] = payload_msg
 
     return result
+
+
+def _extract_text_from_payload(payload: Any) -> str | None:
+    if isinstance(payload, str):
+        value = payload.strip()
+        return value or None
+
+    if isinstance(payload, list):
+        fragments = [fragment for item in payload if (fragment := _extract_text_from_payload(item))]
+        if fragments:
+            return "".join(fragments).strip() or None
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    # Official ASRResponse shape: {"results": [{"text": "...", "is_interim": true}]}
+    results = payload.get("results")
+    if isinstance(results, list):
+        fragments: list[str] = []
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            value = item.get("text")
+            if isinstance(value, str) and value.strip():
+                fragments.append(value.strip())
+        if fragments:
+            return "".join(fragments).strip() or None
+
+    preferred_keys = (
+        "content",
+        "text",
+        "message",
+        "transcript",
+        "utterance",
+        "value",
+    )
+    for key in preferred_keys:
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    nested_keys = (
+        "data",
+        "result",
+        "payload",
+        "transcription",
+        "asr",
+        "recognition",
+        "sentence",
+        "delta",
+    )
+    for key in nested_keys:
+        nested = payload.get(key)
+        text_value = _extract_text_from_payload(nested)
+        if text_value:
+            return text_value
+
+    return None
+
+
+def _payload_preview(payload: Any, limit: int = 400) -> str:
+    try:
+        preview = json.dumps(payload, ensure_ascii=False)
+    except TypeError:
+        preview = repr(payload)
+    if len(preview) > limit:
+        return f"{preview[:limit]}..."
+    return preview
+
+
+def _looks_like_user_transcript_payload(payload: Any) -> bool:
+    return _extract_text_from_payload(payload) is not None
 
 
 class InterviewService:
@@ -315,6 +390,7 @@ class InterviewService:
         upstream_ws: websockets.ClientConnection,
         client_ws: WebSocket,
     ) -> None:
+        saw_user_transcript = False
         while True:
             response = _parse_response(await upstream_ws.recv())
             message_type = response.get("message_type")
@@ -322,6 +398,7 @@ class InterviewService:
             payload_msg = response.get("payload_msg")
 
             if message_type == "SERVER_ERROR":
+                logger.error("Doubao realtime upstream error: %s", _payload_preview(response))
                 await client_ws.send_json(
                     {
                         "type": "error",
@@ -334,9 +411,18 @@ class InterviewService:
                 await client_ws.send_bytes(bytes(payload_msg))
                 continue
 
-            if event == 550 and isinstance(payload_msg, dict):
-                content = payload_msg.get("content")
-                if isinstance(content, str) and content:
+            if event is not None:
+                logger.info(
+                    "Doubao upstream event=%s message_type=%s payload=%s transcript_candidate=%s",
+                    event,
+                    message_type,
+                    _payload_preview(payload_msg),
+                    _looks_like_user_transcript_payload(payload_msg),
+                )
+
+            if event == 550:
+                content = _extract_text_from_payload(payload_msg)
+                if content:
                     await client_ws.send_json(
                         {
                             "type": "assistant_text",
@@ -344,9 +430,11 @@ class InterviewService:
                         }
                     )
                 continue
-            if event == 451 and isinstance(payload_msg, dict):
-                content = payload_msg.get("content")
-                if isinstance(content, str) and content:
+
+            if event == 451:
+                content = _extract_text_from_payload(payload_msg)
+                if content:
+                    saw_user_transcript = True
                     await client_ws.send_json(
                         {
                             "type": "user_text_delta",
@@ -355,9 +443,10 @@ class InterviewService:
                     )
                 continue
 
-            if event == 458 and isinstance(payload_msg, dict):
-                content = payload_msg.get("content")
-                if isinstance(content, str) and content:
+            if event == 458:
+                content = _extract_text_from_payload(payload_msg)
+                if content:
+                    saw_user_transcript = True
                     await client_ws.send_json(
                         {
                             "type": "user_text",
@@ -365,6 +454,7 @@ class InterviewService:
                         }
                     )
                 continue
+
             if event == 359:
                 await client_ws.send_json({"type": "assistant_done"})
                 continue
@@ -374,7 +464,21 @@ class InterviewService:
                 continue
 
             if event == 459:
+                if not saw_user_transcript:
+                    logger.warning(
+                        "Doubao user turn finished without transcript event. payload=%s",
+                        _payload_preview(payload_msg),
+                    )
                 await client_ws.send_json({"type": "user_done"})
+                saw_user_transcript = False
+                continue
+
+            if _looks_like_user_transcript_payload(payload_msg):
+                logger.warning(
+                    "Doubao upstream event=%s carried transcript-like payload but is not mapped yet. payload=%s",
+                    event,
+                    _payload_preview(payload_msg),
+                )
                 continue
 
     async def create_session(self, interview_init: InterviewerInitRequest, user_id: UUID) -> dict[str, Any]:
