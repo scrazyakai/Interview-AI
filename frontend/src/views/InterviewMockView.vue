@@ -155,6 +155,8 @@ type ServerEvent =
   | { type: 'ready'; sessionId: string }
   | { type: 'assistant_text'; text: string }
   | { type: 'assistant_done' }
+  | { type: 'user_text_delta'; text: string }
+  | { type: 'user_text'; text: string }
   | { type: 'user_speaking' }
   | { type: 'user_done' }
   | { type: 'error'; detail: string }
@@ -231,6 +233,7 @@ let processorSourceNode: MediaStreamAudioSourceNode | null = null
 let processorMuteNode: GainNode | null = null
 let nextPlaybackTime = 0
 let activeAssistantMessageId: number | null = null
+let activeUserTranscriptMessageId: number | null = null
 let isIntentionalSocketClose = false
 let pendingPcmBytes = new Uint8Array(0)
 
@@ -259,6 +262,45 @@ function appendAssistantChunk(text: string) {
 
   const target = messages.value.find((message) => message.id === activeAssistantMessageId)
   if (target) target.text += text
+}
+
+function upsertUserTranscriptDraft(text: string) {
+  if (!text) return
+
+  if (activeUserTranscriptMessageId == null) {
+    const id = Date.now() + Math.floor(Math.random() * 1000)
+    activeUserTranscriptMessageId = id
+    messages.value.push({ id, role: 'user', name: '我', text })
+    return
+  }
+
+  const target = messages.value.find((message) => message.id === activeUserTranscriptMessageId)
+  if (target) {
+    target.text = text
+  } else {
+    activeUserTranscriptMessageId = null
+    upsertUserTranscriptDraft(text)
+  }
+}
+
+function finalizeUserTranscript(text?: string) {
+  const finalText = text?.trim()
+  const target =
+    activeUserTranscriptMessageId == null
+      ? null
+      : messages.value.find((message) => message.id === activeUserTranscriptMessageId)
+
+  if (target) {
+    if (finalText) {
+      target.text = finalText
+    } else if (!target.text.trim()) {
+      messages.value = messages.value.filter((message) => message.id !== activeUserTranscriptMessageId)
+    }
+  } else if (finalText) {
+    appendMessage('user', finalText)
+  }
+
+  activeUserTranscriptMessageId = null
 }
 
 function markAssistantDone() {
@@ -324,12 +366,21 @@ function createRealtimeSocket() {
         markAssistantDone()
         return
       }
+      if (payload.type === 'user_text_delta') {
+        upsertUserTranscriptDraft(payload.text)
+        return
+      }
+      if (payload.type === 'user_text') {
+        finalizeUserTranscript(payload.text)
+        return
+      }
       if (payload.type === 'user_speaking') {
         userSpeaking.value = true
         return
       }
       if (payload.type === 'user_done') {
         userSpeaking.value = false
+        finalizeUserTranscript()
         return
       }
       if (payload.type === 'error') {
@@ -355,6 +406,7 @@ function createRealtimeSocket() {
     userSpeaking.value = false
     assistantSpeaking.value = false
     activeAssistantMessageId = null
+    activeUserTranscriptMessageId = null
 
     if (shouldResetToIdle) {
       connectionState.value = 'idle'
@@ -513,6 +565,7 @@ function stopMicrophone() {
   assistantSpeaking.value = false
   userSpeaking.value = false
   activeAssistantMessageId = null
+  activeUserTranscriptMessageId = null
 }
 
 function endInterview() {

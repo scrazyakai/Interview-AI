@@ -56,6 +56,11 @@ async def build_start_session_payload(
 
     return {
         "asr": {
+            "audio_config": {
+                "channel": 1,
+                "format": os.getenv("VOLC_REALTIME_INPUT_FORMAT", "pcm"),
+                "sample_rate": int(os.getenv("VOLC_REALTIME_INPUT_SAMPLE_RATE", "16000")),
+            },
             "extra": {
                 "enable_custom_vad" : True,
                 "end_smooth_window_ms": int(os.getenv("VOLC_REALTIME_END_SMOOTH_WINDOW_MS", "1500")),
