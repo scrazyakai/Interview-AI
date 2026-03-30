@@ -6,6 +6,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File, W
 from pymupdf import pymupdf
 
 from app.common.dependencies import get_current_user_id, parse_user_id_from_token
+from app.realtime.realtime_service import realtime_service
 from app.schemas import InterviewResponse, InterviewSessionCreateResponse
 from app.schemas.interview import InterviewerInitRequest
 from app.services.interview_service import interview_service
@@ -53,7 +54,7 @@ async def interview_ws(websocket: WebSocket) -> None:
         user_id = parse_user_id_from_token(token)
         session_uuid = UUID(session_uuid_raw)
         await websocket.accept()
-        await interview_service.bridge_websocket(websocket, user_id, session_uuid)
+        await realtime_service.bridge_websocket(websocket, user_id, session_uuid)
     except WebSocketDisconnect:
         return
     except HTTPException as err:
@@ -102,3 +103,7 @@ async def upload_resume(file: UploadFile = File(...)):
         if page_text:
             texts.append(page_text)
     return {"resume_text": "\n".join(texts)}
+"""TODO分页查会话消息"""
+@router.get("/session/{session_id}")
+async def get_session_history_pages():
+    pass
