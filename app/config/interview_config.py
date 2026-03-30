@@ -57,6 +57,7 @@ async def build_start_session_payload(
     return {
         "asr": {
             "extra": {
+                "enable_custom_vad" : True,
                 "end_smooth_window_ms": int(os.getenv("VOLC_REALTIME_END_SMOOTH_WINDOW_MS", "1500")),
             },
         },

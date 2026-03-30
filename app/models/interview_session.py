@@ -2,16 +2,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
     DateTime,
-    ForeignKey,
     Identity,
     Index,
-    Integer,
     String,
     Text,
     text,

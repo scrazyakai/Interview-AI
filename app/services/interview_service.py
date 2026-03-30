@@ -217,18 +217,26 @@ class InterviewService:
         return interview
 
     async def bridge_websocket(self, client_ws: WebSocket, user_id: UUID, session_uuid: UUID) -> None:
+        # 获取interview_session实体类
         interview = await self._get_interview_session(user_id, session_uuid)
-
+        # WebSocket连接使用的session_id
         session_id = str(uuid.uuid4())
+        # WS连接详细信息
         ws_config = build_realtime_ws_config()
+        # 建立连接池
         start_session_payload = await build_start_session_payload(interview, input_mod="audio")
-
+        # 打开输入音频转写
+        start_session_payload["input_audio_transcription"] = {
+            "enabled": True
+        }
+        # 建立上游连接
         async with websockets.connect(
             ws_config["base_url"],
             additional_headers=ws_config["headers"],
             ping_interval=None,
         ) as upstream_ws:
-            await upstream_ws.send(_build_event_request(1, None, {}))
+            await upstream_ws.send(_build_event_request(1, None, {"content": start_session_payload}))
+            # 解析结果
             _parse_response(await upstream_ws.recv())
 
             await upstream_ws.send(_build_event_request(100, session_id, start_session_payload))
@@ -336,7 +344,27 @@ class InterviewService:
                         }
                     )
                 continue
+            if event == 451 and isinstance(payload_msg, dict):
+                content = payload_msg.get("content")
+                if isinstance(content, str) and content:
+                    await client_ws.send_json(
+                        {
+                            "type": "user_text_delta",
+                            "text": content,
+                        }
+                    )
+                continue
 
+            if event == 458 and isinstance(payload_msg, dict):
+                content = payload_msg.get("content")
+                if isinstance(content, str) and content:
+                    await client_ws.send_json(
+                        {
+                            "type": "user_text",
+                            "text": content,
+                        }
+                    )
+                continue
             if event == 359:
                 await client_ws.send_json({"type": "assistant_done"})
                 continue
