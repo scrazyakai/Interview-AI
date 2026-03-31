@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.config.db_config import AsyncSessionLocal
 from app.config.interview_config import build_start_session_payload, build_realtime_ws_config
-from app.crud.interview_session import get_session_history_pages
+from app.crud.session_history import get_session_history_pages
 from app.models import InterviewSession
 from app.realtime.realtime_service import _build_event_request, _parse_response
 from app.schemas import InterviewerInitRequest
