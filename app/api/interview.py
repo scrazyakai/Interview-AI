@@ -106,7 +106,7 @@ async def upload_resume(file: UploadFile = File(...)):
         if page_text:
             texts.append(page_text)
     return {"resume_text": "\n".join(texts)}
-"""T分页查会话消息"""
+"""分页查会话消息"""
 @router.get("/session/{session_id}", response_model=SessionHistoryListResponse)
 async def get_session_history_pages(
     session_id: UUID,
