@@ -8,7 +8,7 @@ from app.models.point_record import PointRecordModel
 from app.schemas import PointRecordResponse
 
 
-async def get_point_records(session: AsyncSession, user_id: UUID, offset: int = 1, limit: int = 10) -> List[PointRecordResponse]:
+async def get_point_records(session: AsyncSession, user_id: UUID, offset: int = 0, limit: int = 10) -> List[PointRecordResponse]:
     stmt = (select(PointRecordModel)
             .where(PointRecordModel.user_id == user_id)
             .order_by(PointRecordModel.created_at.desc())

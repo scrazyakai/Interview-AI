@@ -1,14 +1,17 @@
 ﻿from contextlib import suppress
 import traceback
+from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, status, \
+    Query
 from pymupdf import pymupdf
 
 from app.common.dependencies import get_current_user_id, parse_user_id_from_token
 from app.realtime.realtime_service import realtime_service
 from app.schemas import InterviewResponse, InterviewSessionCreateResponse
 from app.schemas.interview import InterviewerInitRequest
+from app.schemas.interview_session import SessionHistoryListResponse
 from app.services.interview_service import interview_service
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
@@ -103,7 +106,18 @@ async def upload_resume(file: UploadFile = File(...)):
         if page_text:
             texts.append(page_text)
     return {"resume_text": "\n".join(texts)}
-"""TODO分页查会话消息"""
-@router.get("/session/{session_id}")
-async def get_session_history_pages():
-    pass
+"""T分页查会话消息"""
+@router.get("/session/{session_id}", response_model=SessionHistoryListResponse)
+async def get_session_history_pages(
+    session_id: UUID,
+    user_id: UUID = Depends(get_current_user_id),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+) -> SessionHistoryListResponse:
+    offset = (page - 1) * page_size
+    return await interview_service.get_session_history(
+        user_id=user_id,
+        offset=offset,
+        session_id=session_id,
+        limit=page_size,
+    )
