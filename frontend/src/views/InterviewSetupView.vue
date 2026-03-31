@@ -95,9 +95,10 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import AppTopbar from '../components/AppTopbar.vue'
+import { experienceLevelOptions, jobTitleOptions, modeOptions } from '../constants/interviewOptions'
 import {
   API_BASE_URL,
   clearAuthSession,
@@ -111,19 +112,8 @@ type CreateSessionResponse = {
   session_uuid: string
 }
 
+const route = useRoute()
 const router = useRouter()
-const jobTitleOptions = ['前端', '后端', '测试', '运维', '全栈']
-const experienceLevelOptions = [
-  { label: '应届生', value: 'intern' },
-  { label: '初级', value: 'junior' },
-  { label: '中级', value: 'mid' },
-  { label: '高级', value: 'senior' },
-]
-const modeOptions = [
-  { value: 'technical', label: '技术面' },
-  { value: 'behavioral', label: '行为面' },
-  { value: 'mixed', label: '综合面' },
-]
 
 const defaultJobTitle = jobTitleOptions[0] ?? '前端'
 const defaultExperienceLevel = experienceLevelOptions[0]?.value ?? 'intern'
@@ -138,6 +128,8 @@ const form = reactive<InterviewSetupPayload>({
   session_uuid: '',
 })
 
+applyPrefillFromQuery()
+
 const submitting = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -146,6 +138,28 @@ const resumeUploaded = ref(false)
 const resumeFileName = ref('')
 
 const isFormValid = computed(() => form.job_description.trim().length > 0)
+
+function getSingleQueryValue(value: unknown): string | null {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value) && typeof value[0] === 'string') return value[0]
+  return null
+}
+
+function applyPrefillFromQuery() {
+  const validJobTitleSet = new Set<string>(jobTitleOptions)
+  const validExperienceLevelSet = new Set<string>(experienceLevelOptions.map((option) => option.value))
+
+  const prefillJobTitle = getSingleQueryValue(route.query.job_title)
+  const prefillExperienceLevel = getSingleQueryValue(route.query.experience_level)
+
+  if (prefillJobTitle && validJobTitleSet.has(prefillJobTitle)) {
+    form.job_title = prefillJobTitle
+  }
+
+  if (prefillExperienceLevel && validExperienceLevelSet.has(prefillExperienceLevel)) {
+    form.experience_level = prefillExperienceLevel
+  }
+}
 
 function logout() {
   clearAuthSession()
