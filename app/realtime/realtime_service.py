@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import gzip
 import json
 import logging
@@ -14,6 +14,7 @@ from sqlalchemy import select
 from app.config.db_config import AsyncSessionLocal
 from app.config.interview_config import build_realtime_ws_config, build_start_session_payload
 from app.models import InterviewSession
+from app.models.session_history import MessageSourceEnum, SessionHistory
 
 PROTOCOL_VERSION = 0b0001
 CLIENT_FULL_REQUEST = 0b0001
@@ -28,12 +29,35 @@ GZIP_COMPRESSION = 0b0001
 FIRST_RESPONSE_CONTENT = "你好，先做下自我介绍吧。"
 logger = logging.getLogger(__name__)
 
+USER_TRANSCRIPT_RESULT_TYPES = {
+    "conversation.item.input_audio_transcription.result",
+}
+USER_TRANSCRIPT_COMPLETED_TYPES = {
+    "conversation.item.input_audio_transcription.completed",
+}
+ASSISTANT_TEXT_DELTA_TYPES = {
+    "response.text.delta",
+    "response.output_text.delta",
+    "response.audio_transcript.delta",
+}
+ASSISTANT_DONE_TYPES = {
+    "response.done",
+    "response.output_text.done",
+    "response.text.done",
+}
+USER_SPEAKING_TYPES = {
+    "input_audio_buffer.speech_started",
+}
+USER_DONE_TYPES = {
+    "input_audio_buffer.speech_stopped",
+}
+
 
 def _generate_header(
-        message_type: int = CLIENT_FULL_REQUEST,
-        message_type_specific_flags: int = MSG_WITH_EVENT,
-        serial_method: int = JSON_SERIALIZATION,
-        compression_type: int = GZIP_COMPRESSION,
+    message_type: int = CLIENT_FULL_REQUEST,
+    message_type_specific_flags: int = MSG_WITH_EVENT,
+    serial_method: int = JSON_SERIALIZATION,
+    compression_type: int = GZIP_COMPRESSION,
 ) -> bytearray:
     header = bytearray()
     header.append((PROTOCOL_VERSION << 4) | 0b0001)
@@ -44,12 +68,12 @@ def _generate_header(
 
 
 def _build_event_request(
-        event: int,
-        session_id: str | None,
-        payload: dict[str, Any],
-        *,
-        message_type: int = CLIENT_FULL_REQUEST,
-        serial_method: int = JSON_SERIALIZATION,
+    event: int,
+    session_id: str | None,
+    payload: dict[str, Any],
+    *,
+    message_type: int = CLIENT_FULL_REQUEST,
+    serial_method: int = JSON_SERIALIZATION,
 ) -> bytes:
     message = bytearray(
         _generate_header(
@@ -87,12 +111,13 @@ def _build_audio_request(session_id: str, audio: bytes) -> bytes:
 def _parse_response(raw: Any) -> dict[str, Any]:
     if isinstance(raw, str):
         return {}
+
     header_size = raw[0] & 0x0F
     message_type = raw[1] >> 4
     message_flags = raw[1] & 0x0F
     serialization_method = raw[2] >> 4
     compression_method = raw[2] & 0x0F
-    payload = raw[header_size * 4:]
+    payload = raw[header_size * 4 :]
 
     result: dict[str, Any] = {}
     start = 0
@@ -104,22 +129,22 @@ def _parse_response(raw: Any) -> dict[str, Any]:
             result["seq"] = int.from_bytes(payload[:4], "big", signed=False)
             start += 4
         if message_flags & MSG_WITH_EVENT:
-            result["event"] = int.from_bytes(payload[start: start + 4], "big", signed=False)
+            result["event"] = int.from_bytes(payload[start : start + 4], "big", signed=False)
             start += 4
 
         payload = payload[start:]
         session_id_size = int.from_bytes(payload[:4], "big", signed=True)
-        session_id = payload[4: 4 + session_id_size]
+        session_id = payload[4 : 4 + session_id_size]
         result["session_id"] = session_id.decode("utf-8", errors="ignore")
-        payload = payload[4 + session_id_size:]
+        payload = payload[4 + session_id_size :]
         payload_size = int.from_bytes(payload[:4], "big", signed=False)
-        payload_msg = payload[4: 4 + payload_size]
+        payload_msg = payload[4 : 4 + payload_size]
         result["payload_size"] = payload_size
     elif message_type == SERVER_ERROR_RESPONSE:
         result["message_type"] = "SERVER_ERROR"
         result["code"] = int.from_bytes(payload[:4], "big", signed=False)
         payload_size = int.from_bytes(payload[4:8], "big", signed=False)
-        payload_msg = payload[8: 8 + payload_size]
+        payload_msg = payload[8 : 8 + payload_size]
         result["payload_size"] = payload_size
     else:
         return result
@@ -138,9 +163,6 @@ def _parse_response(raw: Any) -> dict[str, Any]:
     return result
 
 
-"""提取文本"""
-
-
 def _extract_text_from_payload(payload: Any) -> str | None:
     if isinstance(payload, str):
         value = payload.strip()
@@ -148,7 +170,6 @@ def _extract_text_from_payload(payload: Any) -> str | None:
 
     if isinstance(payload, list):
         fragments = [fragment for item in payload if (fragment := _extract_text_from_payload(item))]
-
         if fragments:
             return "".join(fragments).strip() or None
         return None
@@ -156,7 +177,6 @@ def _extract_text_from_payload(payload: Any) -> str | None:
     if not isinstance(payload, dict):
         return None
 
-    # Official ASRResponse shape: {"results": [{"text": "...", "is_interim": true}]}
     results = payload.get("results")
     if isinstance(results, list):
         fragments: list[str] = []
@@ -170,6 +190,7 @@ def _extract_text_from_payload(payload: Any) -> str | None:
             return "".join(fragments).strip() or None
 
     preferred_keys = (
+        "delta",
         "content",
         "text",
         "message",
@@ -179,8 +200,9 @@ def _extract_text_from_payload(payload: Any) -> str | None:
     )
     for key in preferred_keys:
         value = payload.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
+        text_value = _extract_text_from_payload(value)
+        if text_value:
+            return text_value
 
     nested_keys = (
         "data",
@@ -190,7 +212,8 @@ def _extract_text_from_payload(payload: Any) -> str | None:
         "asr",
         "recognition",
         "sentence",
-        "delta",
+        "item",
+        "response",
     )
     for key in nested_keys:
         nested = payload.get(key)
@@ -215,18 +238,210 @@ def _looks_like_user_transcript_payload(payload: Any) -> bool:
     return _extract_text_from_payload(payload) is not None
 
 
+def _normalize_json_upstream_event(raw_text: str) -> dict[str, Any]:
+    try:
+        payload = json.loads(raw_text)
+    except json.JSONDecodeError:
+        return {
+            "normalized_type": "unknown",
+            "upstream_type": None,
+            "text": None,
+            "is_final": False,
+            "is_legacy": False,
+            "message_type": None,
+            "event": None,
+            "payload": raw_text,
+        }
+
+    if not isinstance(payload, dict):
+        return {
+            "normalized_type": "unknown",
+            "upstream_type": None,
+            "text": None,
+            "is_final": False,
+            "is_legacy": False,
+            "message_type": None,
+            "event": None,
+            "payload": payload,
+        }
+
+    upstream_type = payload.get("type")
+    text = _extract_text_from_payload(payload)
+
+    normalized_type = "unknown"
+    is_final = False
+
+    if upstream_type in USER_TRANSCRIPT_RESULT_TYPES:
+        normalized_type = "user_transcript_delta"
+    elif upstream_type in USER_TRANSCRIPT_COMPLETED_TYPES:
+        normalized_type = "user_transcript_final"
+        is_final = True
+    elif upstream_type in ASSISTANT_TEXT_DELTA_TYPES:
+        normalized_type = "assistant_text_delta"
+    elif upstream_type in ASSISTANT_DONE_TYPES:
+        normalized_type = "assistant_done"
+        is_final = True
+    elif upstream_type in USER_SPEAKING_TYPES:
+        normalized_type = "user_speaking"
+    elif upstream_type in USER_DONE_TYPES:
+        normalized_type = "user_done"
+
+    return {
+        "normalized_type": normalized_type,
+        "upstream_type": upstream_type,
+        "text": text,
+        "is_final": is_final,
+        "is_legacy": False,
+        "message_type": None,
+        "event": None,
+        "payload": payload,
+    }
+
+
+def _normalize_legacy_upstream_event(raw: Any) -> dict[str, Any]:
+    response = _parse_response(raw)
+    message_type = response.get("message_type")
+    event = response.get("event")
+    payload = response.get("payload_msg")
+
+    normalized_type = "unknown"
+    is_final = False
+    text = _extract_text_from_payload(payload)
+
+    if message_type == "SERVER_ERROR":
+        normalized_type = "error"
+    elif message_type == "SERVER_ACK" and event == 352 and isinstance(payload, (bytes, bytearray)):
+        normalized_type = "assistant_audio"
+    elif event == 550:
+        normalized_type = "assistant_text_delta"
+    elif event == 451:
+        normalized_type = "user_transcript_delta"
+    elif event == 458:
+        normalized_type = "user_transcript_final"
+        is_final = True
+    elif event == 359:
+        normalized_type = "assistant_done"
+        is_final = True
+    elif event == 450:
+        normalized_type = "user_speaking"
+    elif event == 459:
+        normalized_type = "user_done"
+
+    return {
+        "normalized_type": normalized_type,
+        "upstream_type": None,
+        "text": text,
+        "is_final": is_final,
+        "is_legacy": True,
+        "message_type": message_type,
+        "event": event,
+        "payload": payload,
+        "response": response,
+    }
+
+
+def _normalize_upstream_event(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, str):
+        return _normalize_json_upstream_event(raw)
+    return _normalize_legacy_upstream_event(raw)
+
+
+def _merge_transcript_fragments(fragments: list[str]) -> str:
+    cleaned = [item.strip() for item in fragments if item and item.strip()]
+    if not cleaned:
+        return ""
+
+    merged = cleaned[0]
+    for piece in cleaned[1:]:
+        if piece.startswith(merged):
+            merged = piece
+        elif merged.startswith(piece):
+            continue
+        else:
+            merged = f"{merged}{piece}"
+    return merged.strip()
+
+
+async def _persist_session_message(
+    session_uuid: UUID,
+    user_id: UUID,
+    message: str,
+    source: MessageSourceEnum,
+) -> None:
+    content = message.strip()
+    if not content:
+        return
+
+    async with AsyncSessionLocal() as session:
+        try:
+            session.add(
+                SessionHistory(
+                    session_id=session_uuid,
+                    user_id=user_id,
+                    message=content,
+                    message_source=source.value,
+                )
+            )
+            await session.commit()
+            logger.info(
+                "session_history persisted source=%s session_uuid=%s message_len=%s",
+                source.value,
+                session_uuid,
+                len(content),
+            )
+        except Exception:
+            with suppress(Exception):
+                await session.rollback()
+            logger.exception(
+                "failed to persist session_history source=%s session_uuid=%s",
+                source.value,
+                session_uuid,
+            )
+
+
 async def _forward_upstream_messages(
-        upstream_ws: websockets.ClientConnection,
-        client_ws: WebSocket,
+    upstream_ws: websockets.ClientConnection,
+    client_ws: WebSocket,
+    user_id: UUID,
+    session_uuid: UUID,
 ) -> None:
     saw_user_transcript = False
-    while True:
-        response = _parse_response(await upstream_ws.recv())
-        message_type = response.get("message_type")
-        event = response.get("event")
-        payload_msg = response.get("payload_msg")
+    assistant_text_buffer: list[str] = []
+    user_text_buffer: list[str] = []
+    user_turn_persisted = False
 
-        if message_type == "SERVER_ERROR":
+    while True:
+        try:
+            raw = await upstream_ws.recv()
+        except websockets.exceptions.ConnectionClosedOK:
+            logger.info("upstream websocket closed normally.")
+            return
+        except websockets.exceptions.ConnectionClosedError:
+            logger.warning("upstream websocket closed with error.")
+            return
+        normalized = _normalize_upstream_event(raw)
+
+        normalized_type = normalized["normalized_type"]
+        upstream_type = normalized.get("upstream_type")
+        text = normalized.get("text")
+        message_type = normalized.get("message_type")
+        event = normalized.get("event")
+        payload = normalized.get("payload")
+        is_legacy = normalized.get("is_legacy", False)
+
+        logger.info(
+            "upstream normalized_type=%s upstream_type=%s legacy=%s event=%s message_type=%s text_len=%s payload=%s",
+            normalized_type,
+            upstream_type,
+            is_legacy,
+            event,
+            message_type,
+            len(text or ""),
+            _payload_preview(payload),
+        )
+
+        if normalized_type == "error":
+            response = normalized.get("response", {})
             logger.error("Doubao realtime upstream error: %s", _payload_preview(response))
             await client_ws.send_json(
                 {
@@ -236,79 +451,88 @@ async def _forward_upstream_messages(
             )
             return
 
-        if message_type == "SERVER_ACK" and event == 352 and isinstance(payload_msg, (bytes, bytearray)):
-            await client_ws.send_bytes(bytes(payload_msg))
+        if normalized_type == "assistant_audio" and isinstance(payload, (bytes, bytearray)):
+            await client_ws.send_bytes(bytes(payload))
             continue
 
-        if event is not None:
-            logger.info(
-                "Doubao upstream event=%s message_type=%s payload=%s transcript_candidate=%s",
-                event,
-                message_type,
-                _payload_preview(payload_msg),
-                _looks_like_user_transcript_payload(payload_msg),
-            )
-
-        if event == 550:
-            content = _extract_text_from_payload(payload_msg)
-            if content:
-                await client_ws.send_json(
-                    {
-                        "type": "assistant_text",
-                        "text": content,
-                    }
-                )
+        if normalized_type == "assistant_text_delta":
+            if text:
+                assistant_text_buffer.append(text)
+                await client_ws.send_json({"type": "assistant_text", "text": text})
             continue
 
-        if event == 451:
-            content = _extract_text_from_payload(payload_msg)
-            if content:
+        if normalized_type == "user_transcript_delta":
+            if text:
                 saw_user_transcript = True
-                await client_ws.send_json(
-                    {
-                        "type": "user_text_delta",
-                        "text": content,
-                    }
-                )
+                user_text_buffer.append(text)
+                await client_ws.send_json({"type": "user_text_delta", "text": text})
             continue
 
-        if event == 458:
-            content = _extract_text_from_payload(payload_msg)
-            if content:
+        if normalized_type == "user_transcript_final":
+            if text:
                 saw_user_transcript = True
-                await client_ws.send_json(
-                    {
-                        "type": "user_text",
-                        "text": content,
-                    }
-                )
+                user_text_buffer = [text]
+                await client_ws.send_json({"type": "user_text", "text": text})
+                await _persist_session_message(session_uuid, user_id, text, MessageSourceEnum.USER)
+                user_turn_persisted = True
             continue
 
-        if event == 359:
+        if normalized_type == "assistant_done":
+            if assistant_text_buffer:
+                assistant_text = "".join(assistant_text_buffer).strip()
+                if assistant_text:
+                    await _persist_session_message(session_uuid, user_id, assistant_text, MessageSourceEnum.AI)
+                assistant_text_buffer.clear()
             await client_ws.send_json({"type": "assistant_done"})
             continue
 
-        if event == 450:
+        if normalized_type == "user_speaking":
             await client_ws.send_json({"type": "user_speaking"})
             continue
 
-        if event == 459:
+        if normalized_type == "user_done":
+            if not user_turn_persisted:
+                fallback_user_text = _merge_transcript_fragments(user_text_buffer)
+                if fallback_user_text:
+                    await _persist_session_message(session_uuid, user_id, fallback_user_text, MessageSourceEnum.USER)
+                    logger.info(
+                        "persisted user transcript on user_done fallback session_uuid=%s len=%s",
+                        session_uuid,
+                        len(fallback_user_text),
+                    )
             if not saw_user_transcript:
                 logger.warning(
-                    "Doubao user turn finished without transcript event. payload=%s",
-                    _payload_preview(payload_msg),
+                    "upstream user turn finished without transcript. payload=%s",
+                    _payload_preview(payload),
                 )
             await client_ws.send_json({"type": "user_done"})
             saw_user_transcript = False
+            user_turn_persisted = False
+            user_text_buffer.clear()
             continue
 
-        if _looks_like_user_transcript_payload(payload_msg):
+        if is_legacy and event is not None:
             logger.warning(
-                "Doubao upstream event=%s carried transcript-like payload but is not mapped yet. payload=%s",
+                "legacy numeric event fallback in use event=%s payload=%s",
                 event,
-                _payload_preview(payload_msg),
+                _payload_preview(payload),
             )
             continue
+
+        if _looks_like_user_transcript_payload(payload):
+            logger.warning(
+                "unmapped transcript-like upstream event type=%s payload=%s",
+                upstream_type,
+                _payload_preview(payload),
+            )
+            continue
+
+        logger.warning(
+            "unknown upstream event type=%s event=%s payload=%s",
+            upstream_type,
+            event,
+            _payload_preview(payload),
+        )
 
 
 async def _get_interview_session(user_id: UUID, session_uuid: UUID) -> InterviewSession:
@@ -328,28 +552,19 @@ async def _get_interview_session(user_id: UUID, session_uuid: UUID) -> Interview
 
 
 class RealtimeService:
-
     async def bridge_websocket(self, client_ws: WebSocket, user_id: UUID, session_uuid: UUID) -> None:
-        # 获取interview_session实体类
         interview = await _get_interview_session(user_id, session_uuid)
-        # WebSocket连接使用的session_id
         session_id = str(uuid.uuid4())
-        # WS连接详细信息
         ws_config = build_realtime_ws_config()
-        # 建立连接池
         start_session_payload = await build_start_session_payload(interview, input_mod="audio")
-        # 打开输入音频转写
-        start_session_payload["input_audio_transcription"] = {
-            "enabled": True
-        }
-        # 建立上游连接
+        start_session_payload["input_audio_transcription"] = {"enabled": True}
+
         async with websockets.connect(
-                ws_config["base_url"],
-                additional_headers=ws_config["headers"],
-                ping_interval=None,
+            ws_config["base_url"],
+            additional_headers=ws_config["headers"],
+            ping_interval=None,
         ) as upstream_ws:
             await upstream_ws.send(_build_event_request(1, None, {"content": start_session_payload}))
-            # 解析结果
             _parse_response(await upstream_ws.recv())
 
             await upstream_ws.send(_build_event_request(100, session_id, start_session_payload))
@@ -370,7 +585,9 @@ class RealtimeService:
             upstream_task = None
             client_task = None
             try:
-                upstream_task = asyncio.create_task(_forward_upstream_messages(upstream_ws, client_ws))
+                upstream_task = asyncio.create_task(
+                    _forward_upstream_messages(upstream_ws, client_ws, user_id, session_uuid)
+                )
                 client_task = asyncio.create_task(self._forward_client_messages(client_ws, upstream_ws, session_id))
                 done, pending = await asyncio.wait(
                     {upstream_task, client_task},
@@ -393,10 +610,10 @@ class RealtimeService:
                     await client_ws.close()
 
     async def _forward_client_messages(
-            self,
-            client_ws: WebSocket,
-            upstream_ws: websockets.ClientConnection,
-            session_id: str,
+        self,
+        client_ws: WebSocket,
+        upstream_ws: websockets.ClientConnection,
+        session_id: str,
     ) -> None:
         while True:
             message = await client_ws.receive()
@@ -422,4 +639,7 @@ class RealtimeService:
                     await upstream_ws.send(_build_event_request(501, session_id, {"content": content}))
             elif data_type == "stop":
                 return
+
+
 realtime_service = RealtimeService()
+
