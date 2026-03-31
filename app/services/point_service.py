@@ -15,13 +15,11 @@ async def get_point_records(session, current_user_id, offset, limit)-> PointReco
     if existing is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    # 计算起始位置，确保不为负数
-    skip = max(0, offset - 1) * limit
 
     items = await point_record.get_point_records(
         session=session,
         user_id=current_user_id,
-        offset=skip,
+        offset=offset,
         limit=limit
     )
     total = await point_record.get_records_total(

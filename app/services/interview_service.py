@@ -1,6 +1,6 @@
 ﻿import base64
 import uuid
-from typing import Any
+from typing import Any, List
 from uuid import UUID
 import websockets
 from fastapi import HTTPException
@@ -9,11 +9,11 @@ from sqlalchemy.exc import IntegrityError
 
 from app.config.db_config import AsyncSessionLocal
 from app.config.interview_config import build_start_session_payload, build_realtime_ws_config
+from app.crud.interview_session import get_session_history_pages
 from app.models import InterviewSession
 from app.realtime.realtime_service import _build_event_request, _parse_response
 from app.schemas import InterviewerInitRequest
-
-
+from app.schemas.interview_session import SessionHistoryListResponse
 
 
 class InterviewService:
@@ -99,4 +99,12 @@ class InterviewService:
                 }
             except IntegrityError as exc:
                 raise HTTPException(status_code=500, detail="Failed to create interview session") from exc
+    async def get_session_history(self, user_id: UUID,offset: int,session_id: UUID,limit: int = 10) -> SessionHistoryListResponse:
+        session_history_list,total = await get_session_history_pages(session_id, user_id, offset, limit)
+
+        return SessionHistoryListResponse(
+                list=session_history_list,
+                total=total,
+            )
+
 interview_service = InterviewService()
