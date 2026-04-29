@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.sql.functions import func
 from starlette import status
 
-from app.config.db_config import AsyncSessionLocal
+from app.db.session import AsyncSessionLocal
 from app.models import InterviewSession
 from app.models.session_history import SessionHistory
 from app.schemas.interview_session import SessionHistoryResponse

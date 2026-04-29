@@ -1,13 +1,13 @@
 ﻿import base64
 import uuid
-from typing import Any, List
+from typing import Any
 from uuid import UUID
 import websockets
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
-from app.config.db_config import AsyncSessionLocal
+from app.db.session import AsyncSessionLocal
 from app.config.interview_config import build_start_session_payload, build_realtime_ws_config
 from app.crud.session_history import get_session_history_pages
 from app.models import InterviewSession

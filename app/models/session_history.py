@@ -8,7 +8,7 @@ from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Index, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from app.models import Base
+from app.db.base import Base
 
 
 class MessageSourceEnum(str, enum.Enum):

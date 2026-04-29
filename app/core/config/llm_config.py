@@ -1,6 +1,8 @@
 import os
 from langchain_openai import ChatOpenAI
 
+from app.core.config.config import settings
+
 
 def get_llm() -> ChatOpenAI:
     """
@@ -10,9 +12,9 @@ def get_llm() -> ChatOpenAI:
         ChatOpenAI: 配置好的 LLM 实例
     """
     return ChatOpenAI(
-        api_key=os.getenv("VOLC_API_KEY"),
-        base_url=os.getenv("VOLC_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3"),
-        model=os.getenv("VOLC_MODEL", "doubao-seed-1-8-251228")
+        api_key=settings.VOLC_API_KEY, #API_KEY
+        base_url=settings.VOLC_BASE_URL,
+        model=settings.VOLC_MODEL
     )
 
 

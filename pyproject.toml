@@ -17,4 +17,5 @@ dependencies = [
     "annotated-doc>=0.0.4",
     "python-dotenv>=1.1.1",
     "websockets>=15.0.1",
+    "pydantic-settings>=2.14.0",
 ]

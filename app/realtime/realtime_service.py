@@ -11,7 +11,7 @@ import websockets
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
-from app.config.db_config import AsyncSessionLocal
+from app.db.session import AsyncSessionLocal
 from app.config.interview_config import build_realtime_ws_config, build_start_session_payload
 from app.models import InterviewSession
 from app.models.session_history import MessageSourceEnum, SessionHistory

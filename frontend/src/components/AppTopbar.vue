@@ -23,6 +23,7 @@ const currentSession = computed(() => internalSession.value)
 const userInitial = computed(() => currentSession.value?.username.slice(0, 1).toUpperCase() ?? 'U')
 const isHomeRoute = computed(() => route.path === '/')
 const isInterviewRoute = computed(() => route.path.startsWith('/interview'))
+const isAboutRoute = computed(() => route.path === '/about')
 
 function syncSession() {
   internalSession.value = loadAuthSession()
@@ -46,6 +47,10 @@ function goHome() {
 
 function goInterview() {
   router.push('/interview/setup')
+}
+
+function goAbout() {
+  router.push('/about')
 }
 
 function goProfile() {
@@ -117,7 +122,9 @@ onUnmounted(() => {
         >
           &#27169;&#25311;&#38754;&#35797;
         </button>
-        <button class="nav-link" type="button" @click="goHome">&#20135;&#21697;&#20171;&#32461;</button>
+        <button class="nav-link" :class="{ 'nav-link-active': isAboutRoute }" type="button" @click="goAbout">
+          &#20135;&#21697;&#20171;&#32461;
+        </button>
       </nav>
 
       <div class="topbar-actions">
@@ -125,16 +132,24 @@ onUnmounted(() => {
           <div class="user-menu">
             <button class="avatar-button" type="button" @click.stop="toggleUserMenu">
               <span class="avatar-circle">{{ userInitial }}</span>
-              <span class="avatar-name">{{ currentSession.username }}</span>
-              <span class="avatar-caret">&#9662;</span>
+              <span class="avatar-copy">
+                <span class="avatar-label">Account</span>
+                <span class="avatar-name">{{ currentSession.username }}</span>
+              </span>
+              <span class="avatar-caret" :class="{ 'avatar-caret-open': userMenuOpen }">&#9662;</span>
             </button>
 
             <div v-if="userMenuOpen" class="user-dropdown">
+              <p class="dropdown-label">已登录账号</p>
+              <p class="dropdown-username">{{ currentSession.username }}</p>
+              <div class="dropdown-divider"></div>
               <button class="dropdown-item" type="button" @click="goProfile">
-                &#20010;&#20154;&#20013;&#24515;
+                <span class="dropdown-item-title">&#20010;&#20154;&#20013;&#24515;</span>
+                <span class="dropdown-item-meta">查看资料与积分记录</span>
               </button>
               <button class="dropdown-item dropdown-item-danger" type="button" @click="handleLogout">
-                &#36864;&#20986;&#30331;&#24405;
+                <span class="dropdown-item-title">&#36864;&#20986;&#30331;&#24405;</span>
+                <span class="dropdown-item-meta">结束当前会话</span>
               </button>
             </div>
           </div>
@@ -151,4 +166,3 @@ onUnmounted(() => {
     </div>
   </header>
 </template>
-

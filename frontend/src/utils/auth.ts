@@ -13,6 +13,11 @@ export type InterviewSetupPayload = {
   session_uuid: string
 }
 
+export type InterviewSessionCreateResponse = {
+  success: boolean
+  session_uuid: string
+}
+
 export const API_BASE_URL = 'http://127.0.0.1:8000/api'
 export const AUTH_STORAGE_KEY = 'interview-ai-auth'
 export const INTERVIEW_SETUP_STORAGE_KEY = 'interview-ai-setup'
@@ -45,6 +50,36 @@ export function saveAuthSession(session: TokenResponse) {
 
 export function clearAuthSession() {
   localStorage.removeItem(AUTH_STORAGE_KEY)
+}
+
+export async function createInterviewSession(
+  payload: Omit<InterviewSetupPayload, 'session_uuid'>,
+): Promise<InterviewSessionCreateResponse> {
+  const authSession = loadAuthSession()
+  if (!authSession?.access_token) {
+    throw new Error('未检测到登录状态，请先登录后再创建面试。')
+  }
+
+  const response = await fetch(`${API_BASE_URL}/interview/create-session`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `${authSession.token_type} ${authSession.access_token}`,
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const data = (await response.json().catch(() => null)) as
+    | InterviewSessionCreateResponse
+    | { detail?: string; message?: string }
+    | null
+
+  if (!response.ok) {
+    const errorData = data as { detail?: string; message?: string } | null
+    throw new Error(errorData?.detail ?? errorData?.message ?? '创建面试会话失败，请稍后重试。')
+  }
+
+  return data as InterviewSessionCreateResponse
 }
 
 export function loadInterviewSetup(): InterviewSetupPayload | null {

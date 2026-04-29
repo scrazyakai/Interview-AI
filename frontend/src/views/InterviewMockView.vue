@@ -1,132 +1,134 @@
 ﻿<template>
-  <div class="interviewPage">
-    <AppTopbar @logout="logout" />
+  <div class="interview-deck">
+    <div class="interview-deck__glow interview-deck__glow--left"></div>
+    <div class="interview-deck__glow interview-deck__glow--right"></div>
 
-    <div class="mainContainer">
-      <div class="chatSection">
-        <div class="chatTopbar">
-          <div>
-            <p class="panelEyebrow">Realtime Interview</p>
-            <h1 class="panelTitle">AI 实时语音面试</h1>
-            <p class="panelSummary">{{ interviewSummary }}</p>
-          </div>
+    <div class="interview-deck__shell">
+      <AppTopbar @logout="logout" />
 
-          <div class="statusGroup">
-            <span class="statusBadge" :class="connectionStatusClass">{{ connectionStatusText }}</span>
-            <span class="statusBadge" :class="assistantSpeaking ? 'statusActive' : 'statusIdle'">
-              {{ assistantSpeaking ? 'AI 回答中' : 'AI 待机' }}
-            </span>
-            <span class="statusBadge" :class="userSpeaking ? 'statusActive' : 'statusIdle'">
-              {{ userSpeaking ? '你正在说话' : '麦克风空闲' }}
-            </span>
-          </div>
-        </div>
-
-        <div ref="messageListRef" class="messageList">
-          <div
-            v-for="message in messages"
-            :key="message.id"
-            class="messageRow"
-            :class="message.role === 'user' ? 'messageRowUser' : 'messageRowAi'"
-          >
-            <img
-              v-if="message.role === 'ai'"
-              :src="interviewerImage"
-              alt="AI interviewer avatar"
-              class="messageAvatar"
-            />
-
-            <div class="messageBubble">
-              <p class="messageName">{{ message.name }}</p>
-              <p class="messageText">{{ message.text }}</p>
+      <div class="mainContainer mainContainer--compact">
+        <section class="chatSection">
+          <div class="chatSection__header">
+            <div>
+              <p class="sectionLabel">Live Transcript</p>
+              <h2 class="sectionTitle">实时对话</h2>
             </div>
-          </div>
-        </div>
-
-        <div class="inputBar">
-          <input
-            v-model="inputValue"
-            class="messageInput"
-            type="text"
-            placeholder="也可以直接输入文字提问..."
-            :disabled="!isRealtimeReady"
-            @keydown.enter.prevent="sendMessage"
-          />
-          <button class="sendButton" type="button" :disabled="!isRealtimeReady" @click="sendMessage">
-            发送
-          </button>
-        </div>
-
-        <p v-if="errorMessage" class="errorBanner">{{ errorMessage }}</p>
-      </div>
-
-      <div class="sidePanel">
-        <div class="interviewerCard">
-          <div class="cardHeader">
-            <span>AI 面试官</span>
-          </div>
-
-          <div class="avatarStage">
-            <div class="avatarCircle">
-              <img :src="interviewerImage" alt="interviewer" class="cardAvatarImage" />
+            <div class="chatSection__pulse" :class="isRealtimeReady ? 'chatSection__pulse--on' : 'chatSection__pulse--off'">
+              <span class="chatSection__pulseDot"></span>
+              {{ isRealtimeReady ? '实时链路已建立' : '等待连接开始' }}
             </div>
           </div>
 
-          <p class="cardHint">
-            开启麦克风后，浏览器会持续把 16k PCM 音频发送到后端，再由后端转给实时面试服务。
-          </p>
-        </div>
-
-        <div class="userCard">
-          <div class="cardHeader">
-            <span>候选人</span>
-          </div>
-
-          <div v-if="!cameraOn" class="avatarStage">
-            <div class="avatarCircle">
-              <img :src="userAvatar" alt="user avatar" class="cardAvatarImage" />
-            </div>
-          </div>
-
-          <video v-else ref="videoRef" autoplay playsinline muted class="mediaFrame"></video>
-
-          <div class="cardActions cardActionsRow">
-            <button class="cameraButton" type="button" :disabled="isConnecting" @click="toggleMicrophone">
-              {{ microphoneOn ? '关闭麦克风' : isConnecting ? '连接中...' : '开启麦克风' }}
-            </button>
-            <button
-              class="cameraButton cameraButtonDanger"
-              type="button"
-              :disabled="!microphoneOn && connectionState !== 'connecting'"
-              @click="endInterview"
+          <div ref="messageListRef" class="messageList">
+            <div
+              v-for="message in messages"
+              :key="message.id"
+              class="messageRow"
+              :class="message.role === 'user' ? 'messageRowUser' : 'messageRowAi'"
             >
-              结束面试
-            </button>
-            <button class="cameraButton" type="button" @click="toggleCamera">
-              {{ cameraOn ? '关闭摄像头' : '开启摄像头' }}
-            </button>
+              <img
+                v-if="message.role === 'ai'"
+                :src="interviewerImage"
+                alt="AI interviewer avatar"
+                class="messageAvatar"
+              />
+
+              <div class="messageBubble">
+                <p class="messageName">{{ message.name }}</p>
+                <p class="messageText">{{ message.text }}</p>
+              </div>
+            </div>
           </div>
 
-          <p class="cameraHint">
-            {{
-              microphoneOn
-                ? '实时语音已连接，可以直接开口回答问题，AI 会返回文本和语音。'
-                : '点击“开启麦克风”后开始本次模拟面试，摄像头仅用于本地预览。'
-            }}
-          </p>
-        </div>
-
-        <div class="infoCard">
-          <div class="cardHeader">
-            <span>本次面试配置</span>
+          <div class="inputBarWrap">
+            <div class="inputBar">
+              <input
+                v-model="inputValue"
+                class="messageInput"
+                type="text"
+                placeholder="也可以直接输入文字提问..."
+                :disabled="!isRealtimeReady"
+                @keydown.enter.prevent="sendMessage"
+              />
+              <button class="sendButton" type="button" :disabled="!isRealtimeReady" @click="sendMessage">
+                发送
+              </button>
+            </div>
+            <p v-if="errorMessage" class="errorBanner">{{ errorMessage }}</p>
           </div>
-          <ul class="infoList">
-            <li><strong>岗位：</strong>{{ interviewSetup?.job_title ?? '-' }}</li>
-            <li><strong>经验：</strong>{{ experienceLevelLabel }}</li>
-            <li><strong>模式：</strong>{{ modeLabel }}</li>
-          </ul>
-          <p class="cardHint">{{ interviewSetup?.job_description ?? '' }}</p>
-        </div>
+        </section>
+
+        <aside class="sidePanel">
+          <section class="controlCard controlCard--dark">
+            <div class="cardHeader">
+              <span>AI 面试官</span>
+              <span class="miniBadge">Voice Coach</span>
+            </div>
+
+            <div class="avatarStage avatarStage--dark">
+              <div class="avatarCircle avatarCircle--lg">
+                <img :src="interviewerImage" alt="interviewer" class="cardAvatarImage" />
+              </div>
+            </div>
+
+            <p class="cardHint cardHintLight">
+              开启麦克风后，浏览器会持续把 16k PCM 音频发送到后端，再由后端转给实时面试服务。
+            </p>
+          </section>
+
+          <section class="controlCard">
+            <div class="cardHeader">
+              <span>候选人控制台</span>
+              <span class="miniBadge miniBadgeWarm">Device</span>
+            </div>
+
+            <div v-if="!cameraOn" class="avatarStage">
+              <div class="avatarCircle avatarCircle--lg">
+                <img :src="userAvatar" alt="user avatar" class="cardAvatarImage" />
+              </div>
+            </div>
+
+            <video v-else ref="videoRef" autoplay playsinline muted class="mediaFrame"></video>
+
+            <div class="actionGrid">
+              <button class="cameraButton cameraButtonPrimary" type="button" :disabled="isConnecting" @click="toggleMicrophone">
+                {{ microphoneOn ? '关闭麦克风' : isConnecting ? '连接中...' : '开启麦克风' }}
+              </button>
+              <button class="cameraButton" type="button" @click="toggleCamera">
+                {{ cameraOn ? '关闭摄像头' : '开启摄像头' }}
+              </button>
+              <button
+                class="cameraButton cameraButtonDanger actionGrid__full"
+                type="button"
+                :disabled="!microphoneOn && connectionState !== 'connecting'"
+                @click="endInterview"
+              >
+                结束面试
+              </button>
+            </div>
+
+            <p class="cameraHint">
+              {{
+                microphoneOn
+                  ? '实时语音已连接，可以直接开口回答问题，AI 会返回文本和语音。'
+                  : '点击“开启麦克风”后开始本次模拟面试，摄像头仅用于本地预览。'
+              }}
+            </p>
+          </section>
+
+          <section class="controlCard">
+            <div class="cardHeader">
+              <span>本次面试配置</span>
+              <span class="miniBadge miniBadgeSoft">Session</span>
+            </div>
+            <ul class="infoList">
+              <li><strong>岗位：</strong>{{ interviewSetup?.job_title ?? '-' }}</li>
+              <li><strong>经验：</strong>{{ experienceLevelLabel }}</li>
+              <li><strong>模式：</strong>{{ modeLabel }}</li>
+            </ul>
+            <p class="cardHint">{{ interviewSetup?.job_description ?? '暂无岗位描述。' }}</p>
+          </section>
+        </aside>
       </div>
     </div>
   </div>
@@ -636,80 +638,509 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.interviewPage {
-  min-height: 100vh;
-}
-.mainContainer {
-  display: flex;
-  gap: 24px;
-  min-height: calc(100vh - 48px);
-  width: min(1440px, calc(100% - 48px));
-  margin: 24px auto 32px;
-  padding: 24px;
-  background: radial-gradient(circle at top right, rgba(255, 217, 153, 0.28), transparent 28%), linear-gradient(180deg, #f4f1ea 0%, #eef2f6 100%);
-}
-.chatSection {
+.interview-deck {
   position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(180deg, #f6efe6 0%, #efe6da 46%, #f4f6f8 100%);
+}
+
+.interview-deck__glow {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(80px);
+  opacity: 0.7;
+}
+
+.interview-deck__glow--left {
+  top: 90px;
+  left: -60px;
+  width: 280px;
+  height: 280px;
+  background: rgba(234, 148, 86, 0.22);
+}
+
+.interview-deck__glow--right {
+  top: 140px;
+  right: -80px;
+  width: 320px;
+  height: 320px;
+  background: rgba(46, 90, 137, 0.12);
+}
+
+.interview-deck__shell {
+  position: relative;
+  z-index: 1;
+  width: min(1480px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 32px;
+}
+
+.interview-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 22px auto 0;
+  padding: 28px 30px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 34px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 26px 80px rgba(79, 56, 36, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.mainContainer {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) 360px;
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.chatSection {
+  display: flex;
+  min-height: 78vh;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 34px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 26px 80px rgba(79, 56, 36, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.chatSection__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 24px 0;
+}
+
+.chatSection__pulse {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.chatSection__pulse--on {
+  background: #ecfdf3;
+  color: #166534;
+}
+
+.chatSection__pulse--off {
+  background: #f3f4f6;
+  color: #667085;
+}
+
+.chatSection__pulseDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.sectionLabel,
+.panelEyebrow {
+  margin: 0 0 8px;
+  color: #9f4f22;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.sectionTitle,
+.panelTitle {
+  margin: 0;
+  color: #1f1710;
+  font-size: clamp(2rem, 3.2vw, 3rem);
+  line-height: 1.04;
+  letter-spacing: -0.05em;
+}
+
+.panelSummary {
+  margin: 10px 0 0;
+  color: #6f6256;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.statusGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.statusGroupHero {
+  justify-content: flex-end;
+}
+
+.statusBadge {
+  padding: 9px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.statusConnected,
+.statusActive {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusConnecting {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.statusIdle {
+  background: #eceff3;
+  color: #5b6572;
+}
+
+.statusError {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.messageList {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  min-width: 0;
-  height: 80vh;
-  padding: 24px 24px 120px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  gap: 18px;
+  overflow-y: auto;
+  margin: 18px 18px 0;
+  padding: 6px 10px 18px;
 }
-.chatTopbar {
+
+.messageRow {
   display: flex;
-  justify-content: space-between;
-  gap: 20px;
   align-items: flex-start;
-  margin-bottom: 20px;
+  gap: 12px;
 }
-.panelEyebrow,.fieldLabel,.configTitle { margin: 0 0 6px; color: #92400e; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
-.panelTitle { margin: 0; color: #111827; font-size: 30px; line-height: 1.1; }
-.panelSummary { margin: 10px 0 0; color: #64748b; font-size: 14px; }
-.statusGroup { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.statusBadge { padding: 8px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
-.statusConnected,.statusActive { background: #dcfce7; color: #166534; }
-.statusConnecting { background: #fef3c7; color: #92400e; }
-.statusIdle { background: #e2e8f0; color: #475569; }
-.statusError { background: #fee2e2; color: #b91c1c; }
-.messageList { display: flex; flex: 1 1 auto; flex-direction: column; gap: 18px; overflow-y: auto; padding-right: 8px; }
-.messageRow { display: flex; align-items: flex-start; gap: 12px; }
-.messageRowAi { justify-content: flex-start; }
-.messageRowUser { justify-content: flex-end; }
-.messageAvatar { width: 42px; height: 42px; flex: none; border: 1px solid #e5e7eb; border-radius: 50%; object-fit: cover; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12); }
-.messageBubble { max-width: min(740px, 72%); padding: 14px 16px; border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 20px; background: #f8fafc; }
-.messageRowUser .messageBubble { background: #dbeafe; border-color: #bfdbfe; }
-.messageName { margin: 0 0 6px; color: #475569; font-size: 13px; font-weight: 700; }
-.messageText { margin: 0; color: #0f172a; font-size: 15px; line-height: 1.75; white-space: pre-wrap; }
-.inputBar { position: absolute; right: 24px; bottom: 24px; left: 24px; display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 18px; background: rgba(255, 255, 255, 0.96); }
-.messageInput { flex: 1 1 auto; border: 0; background: transparent; color: #0f172a; font-size: 15px; outline: none; }
-.sendButton,.cameraButton { display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; cursor: pointer; }
-.sendButton { min-width: 84px; padding: 10px 18px; border: 0; background: #111827; color: #fff; font-size: 14px; font-weight: 700; }
-.sendButton:disabled,.cameraButton:disabled { cursor: not-allowed; opacity: 0.6; }
-.errorBanner { position: absolute; right: 24px; bottom: 90px; left: 24px; margin: 0; padding: 10px 12px; border-radius: 12px; background: #fee2e2; color: #991b1b; font-size: 13px; }
-.sidePanel { display: flex; width: 340px; flex: none; flex-direction: column; gap: 18px; }
-.infoCard,.interviewerCard,.userCard { padding: 16px; border: 1px solid rgba(15, 23, 42, 0.08); border-radius: 24px; background: rgba(255, 255, 255, 0.9); box-shadow: 0 18px 42px rgba(15, 23, 42, 0.06); }
-.cardHeader { display: flex; align-items: center; margin-bottom: 12px; color: #0f172a; font-size: 14px; font-weight: 700; }
-.infoList { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; color: #334155; font-size: 14px; }
-.cardActions { display: flex; gap: 8px; }
-.cardActionsRow { margin-top: 12px; justify-content: space-between; }
-.cameraButton { flex: 1 1 0; min-height: 38px; padding: 8px 10px; border: 1px solid rgba(15, 23, 42, 0.08); background: #f8fafc; color: #111827; font-size: 11px; font-weight: 700; }
-.cameraButtonDanger { border-color: rgba(185, 28, 28, 0.16); background: #fff1f2; color: #b91c1c; }
-.mediaFrame { display: block; width: 100%; height: 180px; border: 1px solid #e5e7eb; border-radius: 16px; object-fit: cover; background: #f8fafc; }
-.avatarStage { display: grid; width: 100%; height: 180px; place-items: center; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 18px; background: radial-gradient(circle at top, rgba(251, 191, 36, 0.16), transparent 38%), linear-gradient(180deg, #f8fafc, #eef2f7); }
-.avatarCircle { display: grid; width: 110px; height: 110px; place-items: center; overflow: hidden; border: 4px solid #ffffff; border-radius: 50%; background: #ffffff; }
-.cardAvatarImage { width: 100%; height: 100%; object-fit: cover; }
-.cardHint,.cameraHint { margin: 12px 0 0; color: #64748b; font-size: 13px; line-height: 1.6; }
-@media (max-width: 980px) { .mainContainer { flex-direction: column; } .chatSection { height: auto; min-height: auto; } .sidePanel { width: 100%; } }
-@media (max-width: 720px) { .mainContainer { width: calc(100% - 24px); margin: 12px auto; padding: 16px; } .chatSection { padding: 18px 18px 112px; } .chatTopbar,.cardActionsRow { flex-direction: column; } .statusGroup { justify-content: flex-start; } .inputBar { right: 18px; bottom: 18px; left: 18px; } .messageBubble { max-width: 100%; } }
+
+.messageRowAi {
+  justify-content: flex-start;
+}
+
+.messageRowUser {
+  justify-content: flex-end;
+}
+
+.messageAvatar {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 10px 22px rgba(79, 56, 36, 0.14);
+}
+
+.messageBubble {
+  max-width: min(760px, 74%);
+  padding: 16px 18px;
+  border: 1px solid rgba(189, 173, 156, 0.4);
+  border-radius: 22px;
+  background: rgba(255, 251, 247, 0.96);
+  box-shadow: 0 16px 30px rgba(79, 56, 36, 0.06);
+}
+
+.messageRowUser .messageBubble {
+  border-color: rgba(219, 180, 145, 0.52);
+  background: linear-gradient(180deg, #fff2e6, #fde8d7);
+}
+
+.messageName {
+  margin: 0 0 6px;
+  color: #7a6858;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.messageText {
+  margin: 0;
+  color: #1f1710;
+  font-size: 15px;
+  line-height: 1.78;
+  white-space: pre-wrap;
+}
+
+.inputBarWrap {
+  padding: 0 18px 18px;
+}
+
+.inputBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(210, 193, 176, 0.52);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.messageInput {
+  flex: 1 1 auto;
+  border: 0;
+  background: transparent;
+  color: #1f1710;
+  font-size: 15px;
+  outline: none;
+}
+
+.sendButton,
+.cameraButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.sendButton {
+  min-width: 88px;
+  padding: 10px 18px;
+  border: 0;
+  background: linear-gradient(135deg, #1f1710, #9f4f22 62%, #d98952);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 14px 28px rgba(159, 79, 34, 0.22);
+}
+
+.sendButton:disabled,
+.cameraButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.errorBanner {
+  margin: 10px 4px 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.sidePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.controlCard {
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 24px 70px rgba(79, 56, 36, 0.12);
+  backdrop-filter: blur(18px);
+}
+
+.controlCard--dark {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(31, 23, 16, 0.97), rgba(60, 40, 27, 0.94));
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: #1f1710;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.controlCard--dark .cardHeader {
+  color: #fff7f0;
+}
+
+.miniBadge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffd8bc;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.miniBadgeWarm {
+  background: #fff2e6;
+  color: #9f4f22;
+}
+
+.miniBadgeSoft {
+  background: #f3f4f6;
+  color: #667085;
+}
+
+.avatarStage {
+  display: grid;
+  width: 100%;
+  height: 188px;
+  place-items: center;
+  border: 1px solid rgba(210, 193, 176, 0.45);
+  border-radius: 24px;
+  background: radial-gradient(circle at top, rgba(241, 181, 128, 0.18), transparent 40%), linear-gradient(180deg, #fffaf5, #f3ede5);
+}
+
+.avatarStage--dark {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: radial-gradient(circle at top, rgba(245, 155, 90, 0.18), transparent 34%), linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+}
+
+.avatarCircle {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.avatarCircle--lg {
+  width: 116px;
+  height: 116px;
+  border: 4px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 14px 28px rgba(79, 56, 36, 0.18);
+}
+
+.cardAvatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mediaFrame {
+  display: block;
+  width: 100%;
+  height: 188px;
+  border: 1px solid rgba(210, 193, 176, 0.45);
+  border-radius: 24px;
+  object-fit: cover;
+  background: #f8fafc;
+}
+
+.actionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.actionGrid__full {
+  grid-column: 1 / -1;
+}
+
+.cameraButton {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid rgba(203, 182, 161, 0.52);
+  background: #fffaf5;
+  color: #1f1710;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cameraButtonPrimary {
+  border: 0;
+  background: linear-gradient(135deg, #1f1710, #9f4f22 62%, #d98952);
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(159, 79, 34, 0.22);
+}
+
+.cameraButtonDanger {
+  border-color: rgba(185, 28, 28, 0.14);
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.infoList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #4c4137;
+  font-size: 14px;
+}
+
+.cardHint,
+.cameraHint {
+  margin: 14px 0 0;
+  color: #6f6256;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.cardHintLight {
+  color: rgba(255, 241, 230, 0.8);
+}
+
+@media (max-width: 1120px) {
+  .mainContainer {
+    grid-template-columns: 1fr;
+  }
+
+  .sidePanel {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: grid;
+  }
+}
+
+@media (max-width: 820px) {
+  .interview-deck__shell {
+    width: calc(100% - 20px);
+    padding-top: 18px;
+  }
+
+  .interview-hero,
+  .chatSection,
+  .controlCard {
+    border-radius: 26px;
+  }
+
+  .interview-hero,
+  .chatSection__header {
+    flex-direction: column;
+  }
+
+  .statusGroupHero {
+    justify-content: flex-start;
+  }
+
+  .sidePanel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .chatSection {
+    min-height: 70vh;
+  }
+
+  .messageBubble {
+    max-width: 100%;
+  }
+
+  .inputBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actionGrid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
-
-
 
 
 

@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 
 from app.common.dependencies import get_current_user_id, auth_service
-from app.config.db_config import get_session
+from app.db.session import get_session
 from app.schemas import UserResponse, PointRecordListResponse
 from app.services import point_service
 from sqlalchemy.ext.asyncio import AsyncSession

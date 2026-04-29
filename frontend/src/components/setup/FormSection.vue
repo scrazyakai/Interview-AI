@@ -1,14 +1,21 @@
 ﻿<template>
-  <section class="rounded-2xl border border-gray-100 bg-white p-6 shadow-md">
-    <form class="space-y-7" @submit.prevent="emit('submit')">
-      <div>
-        <h3 class="text-base font-semibold text-gray-900">基本信息</h3>
-        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+  <div class="rounded-[32px] border border-stone-200/80 bg-[#fffdfa] p-6 shadow-[0_20px_60px_rgba(89,64,43,0.08)]">
+    <form class="space-y-8" @submit.prevent="emit('submit')">
+      <section class="rounded-[28px] border border-stone-200/80 bg-white p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-stone-500">Core Setup</p>
+            <h3 class="mt-3 text-xl font-semibold tracking-[-0.03em] text-stone-950">配置本场面试</h3>
+          </div>
+          <span class="rounded-full bg-[#fff4e8] px-3 py-1 text-xs font-semibold text-[#9f4f22]">Step 1</span>
+        </div>
+
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
           <label class="space-y-2">
-            <span class="text-sm text-gray-600">岗位方向</span>
+            <span class="text-sm font-medium text-stone-600">岗位方向</span>
             <select
               :value="jobTitle"
-              class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 transition hover:border-yellow-400 focus:border-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
+              class="h-12 w-full rounded-2xl border border-stone-200 bg-[#fffaf5] px-4 text-sm text-stone-800 transition hover:border-[#d89b62] focus:border-[#d89b62] focus:outline-none focus:ring-4 focus:ring-[#f4d0ad]/50"
               :disabled="loading"
               @change="emit('update:jobTitle', ($event.target as HTMLSelectElement).value)"
             >
@@ -17,10 +24,10 @@
           </label>
 
           <label class="space-y-2">
-            <span class="text-sm text-gray-600">经验级别</span>
+            <span class="text-sm font-medium text-stone-600">经验级别</span>
             <select
               :value="experienceLevel"
-              class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 transition hover:border-yellow-400 focus:border-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
+              class="h-12 w-full rounded-2xl border border-stone-200 bg-[#fffaf5] px-4 text-sm text-stone-800 transition hover:border-[#d89b62] focus:border-[#d89b62] focus:outline-none focus:ring-4 focus:ring-[#f4d0ad]/50"
               :disabled="loading"
               @change="emit('update:experienceLevel', ($event.target as HTMLSelectElement).value)"
             >
@@ -30,16 +37,23 @@
             </select>
           </label>
         </div>
-      </div>
+      </section>
 
-      <div>
-        <h3 class="text-base font-semibold text-gray-900">面试设置</h3>
-        <div class="mt-4 space-y-4">
+      <section class="rounded-[28px] border border-stone-200/80 bg-white p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-stone-500">Interview Mode</p>
+            <h3 class="mt-3 text-xl font-semibold tracking-[-0.03em] text-stone-950">选择练习方式</h3>
+          </div>
+          <span class="rounded-full bg-[#fff4e8] px-3 py-1 text-xs font-semibold text-[#9f4f22]">Step 2</span>
+        </div>
+
+        <div class="mt-5 space-y-5">
           <label class="space-y-2">
-            <span class="text-sm text-gray-600">面试模式</span>
+            <span class="text-sm font-medium text-stone-600">面试模式</span>
             <select
               :value="mode"
-              class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 transition hover:border-yellow-400 focus:border-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
+              class="h-12 w-full rounded-2xl border border-stone-200 bg-[#fffaf5] px-4 text-sm text-stone-800 transition hover:border-[#d89b62] focus:border-[#d89b62] focus:outline-none focus:ring-4 focus:ring-[#f4d0ad]/50"
               :disabled="loading"
               @change="emit('update:mode', ($event.target as HTMLSelectElement).value)"
             >
@@ -50,10 +64,13 @@
           </label>
 
           <div>
-            <span class="mb-2 block text-sm text-gray-600">上传简历</span>
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <span class="text-sm font-medium text-stone-600">上传简历</span>
+              <span class="text-xs text-stone-500">支持 PDF</span>
+            </div>
             <div
-              class="rounded-xl border-2 border-dashed p-5 text-center transition"
-              :class="isDragOver ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200 hover:border-yellow-400 hover:bg-yellow-50/40'"
+              class="rounded-[24px] border-2 border-dashed p-6 text-center transition"
+              :class="isDragOver ? 'border-[#d89b62] bg-[#fff4e8]' : 'border-stone-200 bg-[#fffaf6] hover:border-[#d89b62] hover:bg-[#fff4e8]/70'"
               @dragover.prevent="isDragOver = true"
               @dragleave.prevent="isDragOver = false"
               @drop.prevent="handleDrop"
@@ -61,41 +78,49 @@
               <input ref="fileInputRef" class="hidden" type="file" accept="application/pdf,.pdf" :disabled="loading" @change="handleSelect" />
               <button
                 type="button"
-                class="text-sm text-gray-700"
+                class="inline-flex rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:border-[#d89b62] hover:text-stone-950"
                 :disabled="loading"
                 @click="fileInputRef?.click()"
               >
-                📄 拖拽 PDF 到这里 或 点击上传
+                上传 PDF 简历
               </button>
-              <p class="mt-2 text-xs text-gray-500">{{ resumeFileName || '尚未选择文件' }}</p>
+              <p class="mt-4 text-sm text-stone-600">拖拽文件到这里，或点击按钮选择本地 PDF。</p>
+              <p class="mt-2 text-xs text-stone-500">{{ resumeFileName || '尚未选择文件' }}</p>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div>
-        <h3 class="text-base font-semibold text-gray-900">补充信息</h3>
-        <p class="mt-2 text-sm text-yellow-700">{{ helperTip }}</p>
+      <section class="rounded-[28px] border border-stone-200/80 bg-white p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-stone-500">Context Brief</p>
+            <h3 class="mt-3 text-xl font-semibold tracking-[-0.03em] text-stone-950">补充岗位背景，让问题更贴近真实需求</h3>
+          </div>
+          <span class="rounded-full bg-[#fff4e8] px-3 py-1 text-xs font-semibold text-[#9f4f22]">Required</span>
+        </div>
+
+        <p class="mt-4 rounded-[20px] bg-[#fff7ef] px-4 py-3 text-sm leading-7 text-[#9f4f22]">{{ helperTip }}</p>
         <textarea
           :value="jobDescription"
-          rows="6"
+          rows="7"
           maxlength="2000"
           :disabled="loading"
-          class="mt-3 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 transition placeholder:text-gray-400 hover:border-yellow-400 focus:border-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-400/50"
+          class="mt-4 w-full rounded-[24px] border border-stone-200 bg-[#fffaf5] px-4 py-4 text-sm leading-7 text-stone-800 transition placeholder:text-stone-400 hover:border-[#d89b62] focus:border-[#d89b62] focus:outline-none focus:ring-4 focus:ring-[#f4d0ad]/50"
           placeholder="示例：
 - 技术栈：Java / Spring Boot / MySQL
 - 岗位：后端开发
 - 重点考察：项目经验 + 八股文"
           @input="emit('update:jobDescription', ($event.target as HTMLTextAreaElement).value)"
         ></textarea>
-      </div>
+      </section>
 
-      <p v-if="errorMessage" class="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ errorMessage }}</p>
+      <p v-if="errorMessage" class="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ errorMessage }}</p>
 
       <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
         <button
           type="button"
-          class="h-11 rounded-xl border border-gray-300 px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          class="h-12 rounded-full border border-stone-300 bg-white px-5 text-sm font-medium text-stone-700 transition hover:border-stone-400 hover:bg-stone-50"
           :disabled="loading"
           @click="emit('back')"
         >
@@ -104,14 +129,14 @@
 
         <button
           type="submit"
-          class="h-11 rounded-xl bg-yellow-500 px-6 text-sm font-semibold text-white shadow-lg transition hover:bg-yellow-600 disabled:cursor-not-allowed disabled:opacity-60"
+          class="inline-flex h-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,#1f1710,#9f4f22_58%,#d98952)] px-6 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(159,79,34,0.28)] transition hover:translate-y-[-1px] hover:shadow-[0_22px_42px_rgba(159,79,34,0.34)] disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="disableSubmit || loading"
         >
-          {{ loading ? '生成中...' : '🚀 创建面试并开始' }}
+          {{ loading ? '生成中...' : '创建面试并开始' }}
         </button>
       </div>
     </form>
-  </section>
+  </div>
 </template>
 
 <script setup lang="ts">
