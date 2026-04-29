@@ -1,13 +1,12 @@
-﻿from contextlib import suppress
+from contextlib import suppress
 import traceback
-from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, status, \
-    Query
+from fastapi import APIRouter, Body, Depends, File, Query, UploadFile, WebSocket, WebSocketDisconnect
 from pymupdf import pymupdf
 
 from app.common.dependencies import get_current_user_id, parse_user_id_from_token
+from app.core.exception import ApiResponse, BizException, ErrorCode
 from app.realtime.realtime_service import realtime_service
 from app.schemas import InterviewResponse, InterviewSessionCreateResponse
 from app.schemas.interview import InterviewerInitRequest
@@ -17,31 +16,18 @@ from app.services.interview_service import interview_service
 router = APIRouter(prefix="/api/interview", tags=["interview"])
 
 
-@router.post("/chat")
-async def chat(message: str = Body(..., embed=True)) -> InterviewResponse:
-    try:
-        cleaned_message = message.strip()
-        if not cleaned_message:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="message cannot be empty",
-            )
+@router.post("/chat", response_model=ApiResponse[InterviewResponse])
+async def chat(message: str = Body(..., embed=True)) -> ApiResponse[InterviewResponse]:
+    cleaned_message = message.strip()
+    if not cleaned_message:
+        raise BizException(
+            code=ErrorCode.EMPTY_MESSAGE,
+            message="message cannot be empty",
+            description="The chat endpoint received a blank message after trimming whitespace.",
+        )
 
-        response = await interview_service.chat(cleaned_message)
-        return InterviewResponse(**response)
-    except HTTPException:
-        raise
-    except ValueError as err:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(err),
-        ) from err
-    except Exception as err:
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Doubao realtime chat failed: {err}",
-        ) from err
+    response = await interview_service.chat(cleaned_message)
+    return ApiResponse.success(data=InterviewResponse(**response))
 
 
 @router.websocket("/ws")
@@ -60,44 +46,38 @@ async def interview_ws(websocket: WebSocket) -> None:
         await realtime_service.bridge_websocket(websocket, user_id, session_uuid)
     except WebSocketDisconnect:
         return
-    except HTTPException as err:
-        traceback.print_exc()
-        with suppress(Exception):
-            await websocket.send_json(
-                {
-                    "type": "error",
-                    "detail": err.detail,
-                }
-            )
-        with suppress(Exception):
-            await websocket.close(code=1008)
     except Exception as err:
         traceback.print_exc()
+        detail = getattr(err, "message", f"Failed to start realtime interview: {err}")
         with suppress(Exception):
             await websocket.send_json(
                 {
                     "type": "error",
-                    "detail": f"Failed to start realtime interview: {err}",
+                    "detail": detail,
                 }
             )
         with suppress(Exception):
             await websocket.close(code=1011)
 
 
-@router.post("/create-session", response_model=InterviewSessionCreateResponse)
+@router.post("/create-session", response_model=ApiResponse[InterviewSessionCreateResponse])
 async def create_session(
     interview_init: InterviewerInitRequest,
     user_id: UUID = Depends(get_current_user_id),
-) -> InterviewSessionCreateResponse:
+) -> ApiResponse[InterviewSessionCreateResponse]:
     result = await interview_service.create_session(interview_init, user_id)
-    return InterviewSessionCreateResponse(**result)
+    return ApiResponse.success(data=InterviewSessionCreateResponse(**result))
 
 
-@router.post("/upload")
-async def upload_resume(file: UploadFile = File(...)):
+@router.post("/upload", response_model=ApiResponse[dict[str, str]])
+async def upload_resume(file: UploadFile = File(...)) -> ApiResponse[dict[str, str]]:
     data = await file.read()
     if not data:
-        raise HTTPException(status_code=400, detail="File is empty")
+        raise BizException(
+            code=ErrorCode.EMPTY_FILE,
+            message="File is empty",
+            description="The resume upload endpoint received an empty file payload.",
+        )
 
     doc = pymupdf.open(stream=data, filetype="pdf")
     texts = []
@@ -105,19 +85,21 @@ async def upload_resume(file: UploadFile = File(...)):
         page_text = page.get_text().strip()
         if page_text:
             texts.append(page_text)
-    return {"resume_text": "\n".join(texts)}
-"""分页查会话消息"""
-@router.get("/session/{session_id}", response_model=SessionHistoryListResponse)
+    return ApiResponse.success(data={"resume_text": "\n".join(texts)})
+
+
+@router.get("/session/{session_id}", response_model=ApiResponse[SessionHistoryListResponse])
 async def get_session_history_pages(
     session_id: UUID,
     user_id: UUID = Depends(get_current_user_id),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
-) -> SessionHistoryListResponse:
+) -> ApiResponse[SessionHistoryListResponse]:
     offset = (page - 1) * page_size
-    return await interview_service.get_session_history(
+    result = await interview_service.get_session_history(
         user_id=user_id,
         offset=offset,
         session_id=session_id,
         limit=page_size,
     )
+    return ApiResponse.success(data=result)

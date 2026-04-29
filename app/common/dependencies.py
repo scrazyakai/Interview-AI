@@ -1,63 +1,49 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.core.exception import BizException, ErrorCode
 from app.services.auth_service import AuthService
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 auth_service = AuthService()
 
 
 async def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> UUID:
-    """
-    从请求头中获取当前登录用户的 user_id
+    if not credentials:
+        raise BizException(
+            code=ErrorCode.INVALID_TOKEN,
+            message="登录已失效，请重新登录",
+            description="Authorization header is missing.",
+        )
 
-    Args:
-        credentials: HTTP Bearer 认证凭据
-
-    Returns:
-        当前用户的 user_id (UUID)
-
-    Raises:
-        HTTPException: 当 token 无效或解析失败时
-    """
     token = credentials.credentials
     user_id_str = auth_service.get_user_id_from_token(token)
 
     if not user_id_str:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise BizException(
+            code=ErrorCode.INVALID_TOKEN,
+            message="登录已失效，请重新登录",
+            description="Token parsing failed or token payload did not contain a user id.",
         )
 
     try:
-        user_id = UUID(user_id_str)
-        return user_id
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid user ID format",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return UUID(user_id_str)
+    except ValueError as exc:
+        raise BizException(
+            code=ErrorCode.INVALID_USER_ID,
+            message="登录信息无效，请重新登录",
+            description="Token payload contained an invalid UUID string for the user id.",
+        ) from exc
 
 
 async def get_optional_user_id(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
 ) -> Optional[UUID]:
-    """
-    可选的认证依赖，返回当前用户的 user_id 或 None
-
-    Args:
-        credentials: 可选的 HTTP Bearer 认证凭据
-
-    Returns:
-        当前用户的 user_id (UUID) 或 None
-    """
     if not credentials:
         return None
 
@@ -71,21 +57,23 @@ async def get_optional_user_id(
         return UUID(user_id_str)
     except ValueError:
         return None
+
+
 def parse_user_id_from_token(token: str) -> UUID:
     user_id_str = auth_service.get_user_id_from_token(token)
 
     if not user_id_str:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise BizException(
+            code=ErrorCode.INVALID_TOKEN,
+            message="登录已失效，请重新登录",
+            description="Token parsing failed or token payload did not contain a user id.",
         )
 
     try:
         return UUID(user_id_str)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid user ID format",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    except ValueError as exc:
+        raise BizException(
+            code=ErrorCode.INVALID_USER_ID,
+            message="登录信息无效，请重新登录",
+            description="Token payload contained an invalid UUID string for the user id.",
+        ) from exc

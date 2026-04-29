@@ -3,8 +3,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from app.core.config.config import settings
 from app.models.interview_session import InterviewSession
-from config import settings
 
 
 

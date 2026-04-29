@@ -6,9 +6,11 @@ load_dotenv()
 
 from app.api import auth, interview
 from app.api import user
+from app.core.exception import register_exception_handlers
 
 
 app = FastAPI()
+register_exception_handlers(app)
 
 # 注册路由
 app.include_router(auth.router)

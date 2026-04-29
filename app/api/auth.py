@@ -1,65 +1,35 @@
-from fastapi import APIRouter, HTTPException
-from starlette import status
+from fastapi import APIRouter
 
-from app.schemas import RegisterRequest, LoginRequest, TokenResponse
+from app.core.exception import ApiResponse, BizException, ErrorCode
+from app.schemas import LoginRequest, RegisterRequest, TokenResponse
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-# 创建 AuthService 实例
 auth_service = AuthService()
 
-import traceback
-from fastapi import HTTPException, status
 
-@router.post("/register", response_model=TokenResponse)
-async def register_user(register_request: RegisterRequest):
-    try:
-        user = await auth_service.register_user(
-            register_request.username,
-            register_request.password
-        )
-        token = auth_service.create_access_token(user)
-        return TokenResponse(username=user.username, access_token=token)
+@router.post("/register", response_model=ApiResponse[TokenResponse])
+async def register_user(register_request: RegisterRequest) -> ApiResponse[TokenResponse]:
+    user = await auth_service.register_user(
+        register_request.username,
+        register_request.password,
+    )
+    token = auth_service.create_access_token(user)
+    return ApiResponse.success(data=TokenResponse(username=user.username, access_token=token))
 
-    except ValueError as err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(err)
-        )
 
-    except Exception as err:
-        traceback.print_exc()
-        print("REGISTER ERROR:", repr(err))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(err)
+@router.post("/login", response_model=ApiResponse[TokenResponse])
+async def login_user(login_request: LoginRequest) -> ApiResponse[TokenResponse]:
+    user = await auth_service.authenticate(
+        login_request.username,
+        login_request.password,
+    )
+    if not user:
+        raise BizException(
+            code=ErrorCode.INVALID_USERNAME_OR_PASSWORD,
+            message="用户名或密码错误",
+            description="User login failed because the username or password did not match.",
         )
 
-@router.post("/login", response_model=TokenResponse)
-async def login_user(login_request: LoginRequest):
-    try:
-        user = await auth_service.authenticate(
-            login_request.username,
-            login_request.password
-        )
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        token = auth_service.create_access_token(user)
-        return TokenResponse(username=user.username, access_token=token)
-
-    except HTTPException:
-        raise
-
-    except Exception as err:
-        traceback.print_exc()
-        print("LOGIN ERROR:", repr(err))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(err)
-        )
+    token = auth_service.create_access_token(user)
+    return ApiResponse.success(data=TokenResponse(username=user.username, access_token=token))

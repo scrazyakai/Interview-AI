@@ -12,6 +12,7 @@ from app.config.auth_config import (
     JWT_ALGORITHM,
     ACCESS_TOKEN_EXPIRE_MINUTES,
 )
+from app.core.exception import BizException, ErrorCode
 from app.db.session import AsyncSessionLocal
 from app.models.point_record import PointRecordModel
 from app.models.user import UserModel
@@ -110,7 +111,11 @@ class AuthService:
             except IntegrityError as exc:
                 await session.rollback()
                 logger.exception("Integrity error on user register: %s", exc)
-                raise ValueError("Username already exists")
+                raise BizException(
+                    code=ErrorCode.USERNAME_ALREADY_EXISTS,
+                    message="用户名已存在",
+                    description="The username violated a unique constraint during registration.",
+                ) from exc
 
             except Exception:
                 await session.rollback()
