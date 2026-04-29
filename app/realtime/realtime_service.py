@@ -1,7 +1,6 @@
 ﻿import asyncio
 import gzip
 import json
-import logging
 import uuid
 from contextlib import suppress
 from typing import Any
@@ -13,6 +12,7 @@ from sqlalchemy import select
 
 from app.db.session import AsyncSessionLocal
 from app.config.interview_config import build_realtime_ws_config, build_start_session_payload
+from app.core.log import get_logger
 from app.models import InterviewSession
 from app.models.session_history import MessageSourceEnum, SessionHistory
 
@@ -27,7 +27,7 @@ JSON_SERIALIZATION = 0b0001
 NO_SERIALIZATION = 0b0000
 GZIP_COMPRESSION = 0b0001
 FIRST_RESPONSE_CONTENT = "你好，先做下自我介绍吧。"
-logger = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 USER_TRANSCRIPT_RESULT_TYPES = {
     "conversation.item.input_audio_transcription.result",
@@ -383,7 +383,7 @@ async def _persist_session_message(
                 )
             )
             await session.commit()
-            logger.info(
+            log.info(
                 "session_history persisted source=%s session_uuid=%s message_len=%s",
                 source.value,
                 session_uuid,
@@ -392,7 +392,7 @@ async def _persist_session_message(
         except Exception:
             with suppress(Exception):
                 await session.rollback()
-            logger.exception(
+            log.exception(
                 "failed to persist session_history source=%s session_uuid=%s",
                 source.value,
                 session_uuid,
@@ -414,10 +414,10 @@ async def _forward_upstream_messages(
         try:
             raw = await upstream_ws.recv()
         except websockets.exceptions.ConnectionClosedOK:
-            logger.info("upstream websocket closed normally.")
+            log.info("upstream websocket closed normally.")
             return
         except websockets.exceptions.ConnectionClosedError:
-            logger.warning("upstream websocket closed with error.")
+            log.warning("upstream websocket closed with error.")
             return
         normalized = _normalize_upstream_event(raw)
 
@@ -429,7 +429,7 @@ async def _forward_upstream_messages(
         payload = normalized.get("payload")
         is_legacy = normalized.get("is_legacy", False)
 
-        logger.info(
+        log.info(
             "upstream normalized_type=%s upstream_type=%s legacy=%s event=%s message_type=%s text_len=%s payload=%s",
             normalized_type,
             upstream_type,
@@ -442,7 +442,7 @@ async def _forward_upstream_messages(
 
         if normalized_type == "error":
             response = normalized.get("response", {})
-            logger.error("Doubao realtime upstream error: %s", _payload_preview(response))
+            log.error("Doubao realtime upstream error: %s", _payload_preview(response))
             await client_ws.send_json(
                 {
                     "type": "error",
@@ -495,13 +495,13 @@ async def _forward_upstream_messages(
                 fallback_user_text = _merge_transcript_fragments(user_text_buffer)
                 if fallback_user_text:
                     await _persist_session_message(session_uuid, user_id, fallback_user_text, MessageSourceEnum.USER)
-                    logger.info(
+                    log.info(
                         "persisted user transcript on user_done fallback session_uuid=%s len=%s",
                         session_uuid,
                         len(fallback_user_text),
                     )
             if not saw_user_transcript:
-                logger.warning(
+                log.warning(
                     "upstream user turn finished without transcript. payload=%s",
                     _payload_preview(payload),
                 )
@@ -512,7 +512,7 @@ async def _forward_upstream_messages(
             continue
 
         if is_legacy and event is not None:
-            logger.warning(
+            log.warning(
                 "legacy numeric event fallback in use event=%s payload=%s",
                 event,
                 _payload_preview(payload),
@@ -520,14 +520,14 @@ async def _forward_upstream_messages(
             continue
 
         if _looks_like_user_transcript_payload(payload):
-            logger.warning(
+            log.warning(
                 "unmapped transcript-like upstream event type=%s payload=%s",
                 upstream_type,
                 _payload_preview(payload),
             )
             continue
 
-        logger.warning(
+        log.warning(
             "unknown upstream event type=%s event=%s payload=%s",
             upstream_type,
             event,

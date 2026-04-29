@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.config.interview_config import build_realtime_ws_config, build_start_session_payload
 from app.core.exception import BizException, ErrorCode
+from app.core.log import get_logger
 from app.crud.session_history import get_session_history_pages
 from app.db.session import AsyncSessionLocal
 from app.models import InterviewSession
@@ -16,11 +17,18 @@ from app.realtime.realtime_service import _build_event_request, _parse_response
 from app.schemas import InterviewerInitRequest
 from app.schemas.interview_session import SessionHistoryListResponse
 
+log = get_logger(__name__)
+
 
 class InterviewService:
     async def chat(self, message: str) -> dict[str, Any]:
         session_id = str(uuid.uuid4())
         try:
+            log.info(
+                "[third_party] Starting realtime interview chat call: session_id=%s input_length=%s",
+                session_id,
+                len(message),
+            )
             ws_config = build_realtime_ws_config()
             start_session_payload = await build_start_session_payload(input_mod="text")
 
@@ -70,6 +78,12 @@ class InterviewService:
 
             reply = "".join(text_fragments).strip()
             audio_bytes = b"".join(audio_chunks)
+            log.info(
+                "[third_party] Completed realtime interview chat call: session_id=%s reply_length=%s audio_bytes=%s",
+                session_id,
+                len(reply),
+                len(audio_bytes),
+            )
 
             return {
                 "reply": reply,
@@ -81,6 +95,7 @@ class InterviewService:
         except BizException:
             raise
         except Exception as exc:
+            log.exception("[exception] Realtime interview chat call failed: session_id=%s", session_id)
             raise BizException(
                 code=ErrorCode.REALTIME_SERVICE_ERROR,
                 message="实时面试服务暂时不可用，请稍后再试",
@@ -103,17 +118,24 @@ class InterviewService:
                 session.add(interview_session)
                 await session.commit()
                 await session.refresh(interview_session)
+                log.info(
+                    "[biz] Interview session created successfully: user_id=%s session_uuid=%s",
+                    user_id,
+                    interview_session.session_uuid,
+                )
                 return {
                     "success": True,
                     "session_uuid": str(interview_session.session_uuid),
                 }
             except IntegrityError as exc:
+                log.exception("[exception] Interview session creation failed with integrity error.")
                 raise BizException(
                     code=ErrorCode.INTERNAL_SERVER_ERROR,
                     message="创建面试会话失败",
                     description="Interview session creation failed due to a database integrity error.",
                 ) from exc
             except Exception as exc:
+                log.exception("[exception] Interview session creation failed with unexpected error.")
                 raise BizException(
                     code=ErrorCode.INTERNAL_SERVER_ERROR,
                     message="创建面试会话失败",
@@ -127,12 +149,15 @@ class InterviewService:
         session_id: UUID,
         limit: int = 10,
     ) -> SessionHistoryListResponse:
-        session_history_list, total = await get_session_history_pages(session_id, user_id, offset, limit)
-
-        return SessionHistoryListResponse(
-            list=session_history_list,
-            total=total,
+        log.info(
+            "[biz] Loading interview session history: user_id=%s session_id=%s offset=%s limit=%s",
+            user_id,
+            session_id,
+            offset,
+            limit,
         )
+        session_history_list, total = await get_session_history_pages(session_id, user_id, offset, limit)
+        return SessionHistoryListResponse(list=session_history_list, total=total)
 
 
 interview_service = InterviewService()

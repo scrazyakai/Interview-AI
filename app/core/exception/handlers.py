@@ -1,4 +1,3 @@
-import logging
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
@@ -9,8 +8,9 @@ from starlette import status
 from app.core.exception.error_code import ErrorCode
 from app.core.exception.exceptions import AppException
 from app.core.exception.response import ApiResponse
+from app.core.log import get_logger
 
-logger = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 def _build_response(
@@ -37,7 +37,7 @@ def _http_exception_code(status_code: int) -> int:
         return ErrorCode.FORBIDDEN
     if status_code == status.HTTP_404_NOT_FOUND:
         return ErrorCode.NOT_FOUND
-    if status_code == status.HTTP_422_UNPROCESSABLE_ENTITY:
+    if status_code in {status.HTTP_422_UNPROCESSABLE_ENTITY, status.HTTP_422_UNPROCESSABLE_CONTENT}:
         return ErrorCode.REQUEST_VALIDATION_ERROR
     if status_code == status.HTTP_502_BAD_GATEWAY:
         return ErrorCode.EXTERNAL_SERVICE_ERROR
@@ -67,7 +67,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppException)
     async def handle_app_exception(_: Request, exc: AppException) -> JSONResponse:
         if exc.description:
-            logger.warning(
+            log.warning(
                 "Business exception raised: code=%s message=%s description=%s",
                 exc.code,
                 exc.message,
@@ -100,7 +100,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def handle_unexpected_exception(_: Request, exc: Exception) -> JSONResponse:
-        logger.exception("Unhandled application exception", exc_info=exc)
+        log.exception("Unhandled application exception", exc_info=exc)
         return _build_response(
             http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             code=ErrorCode.INTERNAL_SERVER_ERROR,

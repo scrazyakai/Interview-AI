@@ -1,7 +1,10 @@
 from app.common.dependencies import auth_service
 from app.core.exception import BizException, ErrorCode
+from app.core.log import get_logger
 from app.crud import point_record
 from app.schemas import PointRecordListResponse
+
+log = get_logger(__name__)
 
 
 class PointService:
@@ -9,6 +12,12 @@ class PointService:
 
 
 async def get_point_records(session, current_user_id, offset, limit) -> PointRecordListResponse:
+    log.info(
+        "[biz] Loading point records: user_id=%s offset=%s limit=%s",
+        current_user_id,
+        offset,
+        limit,
+    )
     existing = await auth_service.get_user(user_id=current_user_id)
     if existing is None:
         raise BizException(
