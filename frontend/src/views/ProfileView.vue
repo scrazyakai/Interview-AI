@@ -3,14 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppTopbar from '../components/AppTopbar.vue'
 
-import { API_BASE_URL, clearAuthSession, loadAuthSession, type TokenResponse } from '../utils/auth'
-
-type ApiEnvelope<T> = {
-  data?: T
-  items?: T
-  list?: T
-  results?: T
-}
+import {
+  API_BASE_URL,
+  clearAuthSession,
+  extractApiPayload,
+  getApiErrorMessage,
+  loadAuthSession,
+  type TokenResponse,
+} from '../utils/auth'
 
 type ProfileData = {
   username?: string
@@ -104,18 +104,6 @@ const displayRecords = computed<DisplayPointRecord[]>(() =>
   }),
 )
 
-function extractPayload<T>(payload: T | ApiEnvelope<T>): T {
-  if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-    const wrapped = payload as ApiEnvelope<T>
-    if (wrapped.data !== undefined) return wrapped.data
-    if (wrapped.items !== undefined) return wrapped.items
-    if (wrapped.list !== undefined) return wrapped.list
-    if (wrapped.results !== undefined) return wrapped.results
-  }
-
-  return payload as T
-}
-
 async function requestWithAuth<T>(path: string): Promise<T> {
   const currentSession = loadAuthSession()
   if (!currentSession) {
@@ -128,22 +116,21 @@ async function requestWithAuth<T>(path: string): Promise<T> {
     },
   })
 
-  const data = (await response.json().catch(() => null)) as
-    | T
-    | { detail?: string; message?: string }
-    | null
+  const data = await response.json().catch(() => null)
 
   if (!response.ok) {
-    const message = (data as { detail?: string; message?: string } | null)?.detail
-      ?? (data as { detail?: string; message?: string } | null)?.message
-      ?? '\u8bf7\u6c42\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002'
-    throw new Error(message)
+    throw new Error(getApiErrorMessage(data, '\u8bf7\u6c42\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002'))
   }
 
-  return data as T
+  const payload = extractApiPayload<T>(data)
+  if (payload === null) {
+    throw new Error('\u8bf7\u6c42\u5931\u8d25\uff1a\u670d\u52a1\u54cd\u5e94\u6570\u636e\u683c\u5f0f\u4e0d\u6b63\u786e\u3002')
+  }
+
+  return payload
 }
 
-function normalizePointRecordResponse(payload: PointRecordListResponse | ApiEnvelope<PointRecord[]> | PointRecord[]) {
+function normalizePointRecordResponse(payload: PointRecordListResponse | PointRecord[]) {
   if (Array.isArray(payload)) {
     return {
       items: payload,
@@ -160,10 +147,9 @@ function normalizePointRecordResponse(payload: PointRecordListResponse | ApiEnve
       }
     }
 
-    const extracted = extractPayload<PointRecord[]>(payload as ApiEnvelope<PointRecord[]>)
     return {
-      items: extracted ?? [],
-      total: Array.isArray(extracted) ? extracted.length : 0,
+      items: [],
+      total: 0,
     }
   }
 
@@ -234,9 +220,9 @@ function logout() {
 }
 
 async function loadPointRecords() {
-  const recordsResponse = await requestWithAuth<
-    PointRecordListResponse | ApiEnvelope<PointRecord[]> | PointRecord[]
-  >(`/user/point-record/list?offset=${currentPage.value}&limit=${PAGE_SIZE}`)
+  const recordsResponse = await requestWithAuth<PointRecordListResponse | PointRecord[]>(
+    `/user/point-record/list?offset=${currentPage.value}&limit=${PAGE_SIZE}`,
+  )
 
   const normalized = normalizePointRecordResponse(recordsResponse)
   pointRecords.value = normalized.items
@@ -254,11 +240,9 @@ async function loadProfilePage() {
       return
     }
 
-    const [meResponse] = await Promise.all([
-      requestWithAuth<ProfileData | ApiEnvelope<ProfileData>>('/user/me'),
-    ])
+    const [meResponse] = await Promise.all([requestWithAuth<ProfileData>('/user/me')])
 
-    profileData.value = extractPayload(meResponse)
+    profileData.value = meResponse
     await loadPointRecords()
   } catch (error) {
     profileError.value =

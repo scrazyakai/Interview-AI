@@ -79,6 +79,7 @@ import AppTopbar from '../components/AppTopbar.vue'
 import {
   API_BASE_URL,
   clearAuthSession,
+  getApiErrorMessage,
   loadAuthSession,
   saveAuthSession,
   type TokenResponse,
@@ -163,19 +164,14 @@ async function submitAuthForm() {
       body: JSON.stringify({ username, password }),
     })
 
-    const data = (await response.json().catch(() => null)) as
-      | TokenResponse
-      | { detail?: string; message?: string }
-      | null
+    const data = await response.json().catch(() => null)
 
     if (!response.ok) {
-      const errorData = data as { detail?: string; message?: string } | null
-      authError.value = errorData?.detail ?? errorData?.message ?? '认证失败，请稍后重试。'
+      authError.value = getApiErrorMessage(data, '认证失败，请稍后重试。')
       return
     }
 
-    const session = data as TokenResponse
-    saveAuthSession(session)
+    saveAuthSession(data)
     syncSession()
     authForm.value.password = ''
     authSuccess.value = authMode.value === 'login' ? '登录成功。' : '注册成功，已自动登录。'

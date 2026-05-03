@@ -4,6 +4,16 @@
   username: string
 }
 
+type ApiEnvelope<T> = {
+  code?: number
+  message?: string
+  detail?: string
+  data?: T
+  items?: T
+  list?: T
+  results?: T
+}
+
 export type InterviewSetupPayload = {
   job_title: string
   job_description: string
@@ -22,6 +32,63 @@ export const API_BASE_URL = 'http://127.0.0.1:8000/api'
 export const AUTH_STORAGE_KEY = 'interview-ai-auth'
 export const INTERVIEW_SETUP_STORAGE_KEY = 'interview-ai-setup'
 
+function extractEnvelopePayload<T>(payload: unknown): T | null {
+  if (!payload || typeof payload !== 'object') return null
+
+  const wrapped = payload as ApiEnvelope<T>
+  if (wrapped.data !== undefined) return wrapped.data
+  if (wrapped.items !== undefined) return wrapped.items
+  if (wrapped.list !== undefined) return wrapped.list
+  if (wrapped.results !== undefined) return wrapped.results
+
+  return payload as T
+}
+
+export function extractApiPayload<T>(payload: unknown): T | null {
+  return extractEnvelopePayload<T>(payload)
+}
+
+export function getApiErrorMessage(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== 'object') return fallback
+
+  const wrapped = payload as ApiEnvelope<unknown>
+  if (typeof wrapped.detail === 'string' && wrapped.detail.trim()) return wrapped.detail
+  if (typeof wrapped.message === 'string' && wrapped.message.trim() && wrapped.message !== 'success') {
+    return wrapped.message
+  }
+
+  const nested = extractEnvelopePayload<Record<string, unknown>>(payload)
+  if (!nested || typeof nested !== 'object') return fallback
+
+  const nestedDetail = nested.detail
+  if (typeof nestedDetail === 'string' && nestedDetail.trim()) return nestedDetail
+
+  const nestedMessage = nested.message
+  if (typeof nestedMessage === 'string' && nestedMessage.trim() && nestedMessage !== 'success') {
+    return nestedMessage
+  }
+
+  return fallback
+}
+
+function toTokenResponse(payload: unknown): TokenResponse | null {
+  const normalized = extractEnvelopePayload<Record<string, unknown>>(payload)
+  if (!normalized || typeof normalized !== 'object') return null
+
+  const accessToken = normalized.access_token
+  const username = normalized.username
+  const tokenType = normalized.token_type
+
+  if (typeof accessToken !== 'string' || !accessToken.trim()) return null
+  if (typeof username !== 'string' || !username.trim()) return null
+
+  return {
+    access_token: accessToken,
+    token_type: typeof tokenType === 'string' && tokenType.trim() ? tokenType : 'bearer',
+    username,
+  }
+}
+
 export function getInterviewWebSocketUrl(token: string, sessionUuid: string) {
   const apiUrl = new URL(API_BASE_URL)
   apiUrl.protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -37,15 +104,20 @@ export function loadAuthSession(): TokenResponse | null {
   if (!raw) return null
 
   try {
-    return JSON.parse(raw) as TokenResponse
+    return toTokenResponse(JSON.parse(raw))
   } catch {
     localStorage.removeItem(AUTH_STORAGE_KEY)
     return null
   }
 }
 
-export function saveAuthSession(session: TokenResponse) {
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session))
+export function saveAuthSession(session: TokenResponse | unknown) {
+  const normalized = toTokenResponse(session)
+  if (!normalized) {
+    throw new Error('登录响应缺少有效的用户信息，请稍后重试。')
+  }
+
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(normalized))
 }
 
 export function clearAuthSession() {
@@ -69,17 +141,18 @@ export async function createInterviewSession(
     body: JSON.stringify(payload),
   })
 
-  const data = (await response.json().catch(() => null)) as
-    | InterviewSessionCreateResponse
-    | { detail?: string; message?: string }
-    | null
+  const data = await response.json().catch(() => null)
 
   if (!response.ok) {
-    const errorData = data as { detail?: string; message?: string } | null
-    throw new Error(errorData?.detail ?? errorData?.message ?? '创建面试会话失败，请稍后重试。')
+    throw new Error(getApiErrorMessage(data, '创建面试会话失败，请稍后重试。'))
   }
 
-  return data as InterviewSessionCreateResponse
+  const sessionPayload = extractApiPayload<InterviewSessionCreateResponse>(data)
+  if (!sessionPayload?.session_uuid) {
+    throw new Error('创建面试会话失败：服务响应缺少 session_uuid。')
+  }
+
+  return sessionPayload
 }
 
 export function loadInterviewSetup(): InterviewSetupPayload | null {
