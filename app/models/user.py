@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import text, String, Integer, func
+from sqlalchemy import text, String, Integer, func, SmallInteger, BigInteger
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,7 +14,7 @@ class UserModel(Base):
     __table_args__ = {"schema": "interview"}
 
     id: Mapped[int] = mapped_column(
-        Integer,
+        BigInteger,
         primary_key=True,
         autoincrement=True,
     )
@@ -60,3 +60,4 @@ class UserModel(Base):
         nullable=False,
         server_default=text("0"),
     )
+    role_type: Mapped[int] = mapped_column(SmallInteger)

@@ -23,3 +23,7 @@ class ErrorCode:
     INTERNAL_SERVER_ERROR = 50000
     EXTERNAL_SERVICE_ERROR = 50200
     REALTIME_SERVICE_ERROR = 50201
+
+    """embedding error code"""
+    CHUNCK_IS_NONE = 40010
+    VECTOR_IS_NONE = 40011

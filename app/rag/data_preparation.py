@@ -326,3 +326,4 @@ class DataPreparation:
             "difficulty_distribution": difficulty_count,
             "type_distribution": type_count,
         }
+    #TODO 智能去重（相似度超过90就判定为相同），温江上传方向上就使用Hash来判断
