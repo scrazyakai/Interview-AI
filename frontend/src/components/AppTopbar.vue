@@ -107,7 +107,7 @@ onUnmounted(() => {
       class="flex items-center gap-2 cursor-pointer active:scale-95 duration-200"
       @click="goHome"
     >
-      <span class="material-symbols-outlined text-primary" style="font-size:24px;">psychology</span>
+      <svg viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-primary" style="width:24px;height:24px;"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 3C1.22386 3 1 3.22386 1 3.5C1 3.77614 1.22386 4 1.5 4H13.5C13.7761 4 14 3.77614 14 3.5C14 3.22386 13.7761 3 13.5 3H1.5ZM1 7.5C1 7.22386 1.22386 7 1.5 7H13.5C13.7761 7 14 7.22386 14 7.5C14 7.77614 13.7761 8 13.5 8H1.5C1.22386 8 1 7.77614 1 7.5ZM1 11.5C1 11.2239 1.22386 11 1.5 11H13.5C13.7761 11 14 11.2239 14 11.5C14 11.7761 13.7761 12 13.5 12H1.5C1.22386 12 1 11.7761 1 11.5Z" fill="currentColor"></path></svg>
       <span class="font-bold text-xl text-primary" style="font-family: 'Inter', sans-serif;">InterviewAI</span>
     </button>
 
@@ -150,7 +150,7 @@ onUnmounted(() => {
               class="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-on-primary"
             >{{ userInitial }}</span>
             <span class="hidden sm:block max-w-[120px] truncate">{{ currentSession.username }}</span>
-            <span class="material-symbols-outlined text-outline transition-transform duration-200" style="font-size:18px;" :class="{ 'rotate-180': userMenuOpen }">expand_more</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="text-outline transition-transform duration-200" style="width:18px;height:18px;" :class="{ 'rotate-180': userMenuOpen }"><path d="M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z"></path></svg>
           </button>
 
           <!-- Dropdown -->
