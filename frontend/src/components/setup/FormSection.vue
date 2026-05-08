@@ -1,140 +1,130 @@
 ﻿<template>
-  <div class="rounded-[32px] border border-stone-200/80 bg-[#fffdfa] p-6 shadow-[0_20px_60px_rgba(89,64,43,0.08)]">
-    <form class="space-y-8" @submit.prevent="emit('submit')">
-      <section class="rounded-[28px] border border-stone-200/80 bg-white p-5">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-stone-500">Core Setup</p>
-            <h3 class="mt-3 text-xl font-semibold tracking-[-0.03em] text-stone-950">配置本场面试</h3>
-          </div>
-          <span class="rounded-full bg-[#fff4e8] px-3 py-1 text-xs font-semibold text-[#9f4f22]">Step 1</span>
+  <div class="p-6 lg:p-8">
+    <form class="space-y-6" @submit.prevent="emit('submit')">
+
+      <!-- Job Title -->
+      <div class="space-y-1.5">
+        <label class="block font-mono text-xs font-semibold uppercase tracking-[0.05em] text-on-surface-variant">岗位名称</label>
+        <div class="relative">
+          <select
+            :value="jobTitle"
+            class="h-12 w-full appearance-none rounded-lg border border-outline-variant bg-white/50 px-6 pr-10 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+            :disabled="loading"
+            @change="emit('update:jobTitle', ($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="option in jobTitleOptions" :key="option" :value="option">{{ option }}</option>
+          </select>
+          <span class="material-symbols-outlined pointer-events-none absolute right-4 top-3 text-outline" style="font-size:20px;">expand_more</span>
         </div>
+      </div>
 
-        <div class="mt-5 grid gap-4 sm:grid-cols-2">
-          <label class="space-y-2">
-            <span class="text-sm font-medium text-stone-600">岗位方向</span>
-            <select
-              :value="jobTitle"
-              class="h-12 w-full rounded-2xl border border-stone-200 bg-[#fffaf5] px-4 text-sm text-stone-800 transition hover:border-[#d89b62] focus:border-[#d89b62] focus:outline-none focus:ring-4 focus:ring-[#f4d0ad]/50"
-              :disabled="loading"
-              @change="emit('update:jobTitle', ($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="option in jobTitleOptions" :key="option" :value="option">{{ option }}</option>
-            </select>
-          </label>
-
-          <label class="space-y-2">
-            <span class="text-sm font-medium text-stone-600">经验级别</span>
+      <!-- Experience Level & Mode -->
+      <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div class="space-y-1.5">
+          <label class="block font-mono text-xs font-semibold uppercase tracking-[0.05em] text-on-surface-variant">经验等级</label>
+          <div class="relative">
             <select
               :value="experienceLevel"
-              class="h-12 w-full rounded-2xl border border-stone-200 bg-[#fffaf5] px-4 text-sm text-stone-800 transition hover:border-[#d89b62] focus:border-[#d89b62] focus:outline-none focus:ring-4 focus:ring-[#f4d0ad]/50"
+              class="h-12 w-full appearance-none rounded-lg border border-outline-variant bg-white/50 px-6 pr-10 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
               :disabled="loading"
               @change="emit('update:experienceLevel', ($event.target as HTMLSelectElement).value)"
             >
-              <option v-for="option in experienceLevelOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
+              <option v-for="option in experienceLevelOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
-          </label>
-        </div>
-      </section>
-
-      <section class="rounded-[28px] border border-stone-200/80 bg-white p-5">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-stone-500">Interview Mode</p>
-            <h3 class="mt-3 text-xl font-semibold tracking-[-0.03em] text-stone-950">选择练习方式</h3>
+            <span class="material-symbols-outlined pointer-events-none absolute right-4 top-3 text-outline" style="font-size:20px;">expand_more</span>
           </div>
-          <span class="rounded-full bg-[#fff4e8] px-3 py-1 text-xs font-semibold text-[#9f4f22]">Step 2</span>
         </div>
-
-        <div class="mt-5 space-y-5">
-          <label class="space-y-2">
-            <span class="text-sm font-medium text-stone-600">面试模式</span>
+        <div class="space-y-1.5">
+          <label class="block font-mono text-xs font-semibold uppercase tracking-[0.05em] text-on-surface-variant">面试模式</label>
+          <div class="relative">
             <select
               :value="mode"
-              class="h-12 w-full rounded-2xl border border-stone-200 bg-[#fffaf5] px-4 text-sm text-stone-800 transition hover:border-[#d89b62] focus:border-[#d89b62] focus:outline-none focus:ring-4 focus:ring-[#f4d0ad]/50"
+              class="h-12 w-full appearance-none rounded-lg border border-outline-variant bg-white/50 px-6 pr-10 text-sm text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
               :disabled="loading"
               @change="emit('update:mode', ($event.target as HTMLSelectElement).value)"
             >
-              <option v-for="option in modeOptions" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
+              <option v-for="option in modeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
-          </label>
-
-          <div>
-            <div class="mb-2 flex items-center justify-between gap-3">
-              <span class="text-sm font-medium text-stone-600">上传简历</span>
-              <span class="text-xs text-stone-500">支持 PDF</span>
-            </div>
-            <div
-              class="rounded-[24px] border-2 border-dashed p-6 text-center transition"
-              :class="isDragOver ? 'border-[#d89b62] bg-[#fff4e8]' : 'border-stone-200 bg-[#fffaf6] hover:border-[#d89b62] hover:bg-[#fff4e8]/70'"
-              @dragover.prevent="isDragOver = true"
-              @dragleave.prevent="isDragOver = false"
-              @drop.prevent="handleDrop"
-            >
-              <input ref="fileInputRef" class="hidden" type="file" accept="application/pdf,.pdf" :disabled="loading" @change="handleSelect" />
-              <button
-                type="button"
-                class="inline-flex rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:border-[#d89b62] hover:text-stone-950"
-                :disabled="loading"
-                @click="fileInputRef?.click()"
-              >
-                上传 PDF 简历
-              </button>
-              <p class="mt-4 text-sm text-stone-600">拖拽文件到这里，或点击按钮选择本地 PDF。</p>
-              <p class="mt-2 text-xs text-stone-500">{{ resumeFileName || '尚未选择文件' }}</p>
-            </div>
+            <span class="material-symbols-outlined pointer-events-none absolute right-4 top-3 text-outline" style="font-size:20px;">expand_more</span>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section class="rounded-[28px] border border-stone-200/80 bg-white p-5">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.26em] text-stone-500">Context Brief</p>
-            <h3 class="mt-3 text-xl font-semibold tracking-[-0.03em] text-stone-950">补充岗位背景，让问题更贴近真实需求</h3>
-          </div>
-          <span class="rounded-full bg-[#fff4e8] px-3 py-1 text-xs font-semibold text-[#9f4f22]">Required</span>
+      <!-- Job Description -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <label class="font-mono text-xs font-semibold uppercase tracking-[0.05em] text-on-surface-variant">岗位描述 (必填)</label>
+          <span class="text-sm text-error">* 必填</span>
         </div>
-
-        <p class="mt-4 rounded-[20px] bg-[#fff7ef] px-4 py-3 text-sm leading-7 text-[#9f4f22]">{{ helperTip }}</p>
         <textarea
           :value="jobDescription"
-          rows="7"
+          rows="5"
           maxlength="2000"
           :disabled="loading"
-          class="mt-4 w-full rounded-[24px] border border-stone-200 bg-[#fffaf5] px-4 py-4 text-sm leading-7 text-stone-800 transition placeholder:text-stone-400 hover:border-[#d89b62] focus:border-[#d89b62] focus:outline-none focus:ring-4 focus:ring-[#f4d0ad]/50"
-          placeholder="示例：
-- 技术栈：Java / Spring Boot / MySQL
-- 岗位：后端开发
-- 重点考察：项目经验 + 八股文"
+          class="w-full rounded-lg border border-outline-variant bg-white/50 p-6 text-sm leading-relaxed text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50 placeholder:text-outline"
+          placeholder="在这里粘贴职位要求..."
           @input="emit('update:jobDescription', ($event.target as HTMLTextAreaElement).value)"
         ></textarea>
-      </section>
-
-      <p v-if="errorMessage" class="rounded-[20px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ errorMessage }}</p>
-
-      <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          type="button"
-          class="h-12 rounded-full border border-stone-300 bg-white px-5 text-sm font-medium text-stone-700 transition hover:border-stone-400 hover:bg-stone-50"
-          :disabled="loading"
-          @click="emit('back')"
-        >
-          返回首页
-        </button>
-
-        <button
-          type="submit"
-          class="inline-flex h-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,#1f1710,#9f4f22_58%,#d98952)] px-6 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(159,79,34,0.28)] transition hover:translate-y-[-1px] hover:shadow-[0_22px_42px_rgba(159,79,34,0.34)] disabled:cursor-not-allowed disabled:opacity-60"
-          :disabled="disableSubmit || loading"
-        >
-          {{ loading ? '生成中...' : '创建面试并开始' }}
-        </button>
       </div>
+
+      <!-- Resume Upload -->
+      <div class="space-y-1.5">
+        <label class="block font-mono text-xs font-semibold uppercase tracking-[0.05em] text-on-surface-variant">上传简历</label>
+        <div
+          class="group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low p-6 transition-colors hover:bg-surface-container-high"
+          :class="isDragOver ? 'border-primary bg-surface-container-high' : ''"
+          @click="fileInputRef?.click()"
+          @dragover.prevent="isDragOver = true"
+          @dragleave.prevent="isDragOver = false"
+          @drop.prevent="handleDrop"
+        >
+          <input ref="fileInputRef" class="hidden" type="file" accept="application/pdf,.pdf" :disabled="loading" @change="handleSelect" />
+          <span
+            class="material-symbols-outlined mb-3 text-4xl transition-colors"
+            :class="isDragOver ? 'text-primary' : 'text-outline group-hover:text-primary'"
+          >cloud_upload</span>
+          <p class="text-sm font-semibold text-primary">点击上传或拖拽文件</p>
+          <p class="text-sm text-on-surface-variant">上传简历可提高题目质量</p>
+          <p class="mt-1 font-mono text-[11px] tracking-[0.05em] text-outline">{{ resumeFileName || 'PDF（最大 5MB）' }}</p>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <p v-if="errorMessage" class="rounded-lg border border-error-container bg-error-container/50 px-4 py-3 text-sm text-on-error-container">{{ errorMessage }}</p>
+
+      <!-- Ready Check & Submit -->
+      <div class="border-t border-outline-variant/20 pt-6">
+        <div class="flex flex-col gap-6 rounded-xl bg-surface-container-highest/30 p-6 md:flex-row md:items-center md:justify-between">
+          <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
+              <span class="material-symbols-outlined" style="font-size:20px;">rocket_launch</span>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-on-surface">准备好开始了？</p>
+              <p class="text-sm text-on-surface-variant">您的模拟面试大约需要 20 分钟。</p>
+            </div>
+          </div>
+          <div class="flex shrink-0 items-center gap-3">
+            <button
+              type="button"
+              class="h-10 rounded-lg border border-outline-variant bg-white/50 px-4 text-sm font-medium text-on-surface-variant transition-all hover:border-outline hover:bg-surface-container-high disabled:opacity-50"
+              :disabled="loading"
+              @click="emit('back')"
+            >
+              返回
+            </button>
+            <button
+              type="submit"
+              class="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-sm font-semibold text-on-primary shadow-md transition-all active:scale-95 hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="disableSubmit || loading"
+            >
+              {{ loading ? '生成中...' : '创建并开始面试' }}
+              <span class="material-symbols-outlined" style="font-size:20px;">arrow_forward</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
     </form>
   </div>
 </template>

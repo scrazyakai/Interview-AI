@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import InterviewMockView from '../views/InterviewMockView.vue'
 import InterviewSetupView from '../views/InterviewSetupView.vue'
 import ProfileView from '../views/ProfileView.vue'
+import ResultsView from '../views/ResultsView.vue'
 import { loadInterviewSetup } from '../utils/auth'
 
 const router = createRouter({
@@ -33,6 +34,11 @@ const router = createRouter({
       name: 'interview',
       component: InterviewMockView,
       meta: { requiresInterviewSetup: true },
+    },
+    {
+      path: '/results',
+      name: 'results',
+      component: ResultsView,
     },
   ],
 })

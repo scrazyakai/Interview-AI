@@ -1,12 +1,69 @@
 ﻿<template>
-  <main class="relative overflow-hidden bg-[#f6efe6] px-4 py-8 text-stone-900 sm:px-6 lg:px-8 lg:py-10">
-    <div class="pointer-events-none absolute inset-x-0 top-0 h-[380px] bg-[radial-gradient(circle_at_top_left,_rgba(235,158,95,0.28),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(120,85,58,0.16),_transparent_30%)]"></div>
-    <div class="pointer-events-none absolute inset-x-0 top-[180px] mx-auto h-[520px] max-w-6xl rounded-[48px] bg-white/24 blur-3xl"></div>
+  <main class="px-6 pb-20 pt-24 lg:px-12 lg:pb-24 max-w-[1280px] mx-auto">
+    <div class="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:items-start">
+      <!-- Left Column: Intro & Feature Cards -->
+      <div class="lg:col-span-5 flex flex-col justify-center">
+        <p class="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-secondary">
+          Interview Setup
+        </p>
+        <h1 class="mt-4 text-4xl font-bold leading-tight tracking-tight text-primary lg:text-5xl">
+          设置您的<br />AI 模拟面试
+        </h1>
+        <p class="mt-4 text-lg leading-relaxed text-on-surface-variant">
+          配置您的会话，以获得针对您的目标角色和经验水平定制的高保真 AI 反馈。
+        </p>
 
-    <div class="relative mx-auto max-w-6xl">
+        <!-- Hero image card -->
+        <div class="relative mt-8 w-full overflow-hidden rounded-xl shadow-xl aspect-video glass-panel">
+          <img
+            src="../assets/AI-Power-Insight.png"
+            alt="AI 面试助手"
+            class="h-full w-full object-cover"
+          />
+          <div class="absolute inset-0 bg-gradient-to-t from-primary/50 to-transparent"></div>
+          <div
+            class="absolute bottom-4 left-4 flex items-center gap-1.5 rounded-full border border-white/20 bg-surface/90 px-3 py-1.5 shadow-sm backdrop-blur-sm"
+          >
+            <span class="material-symbols-outlined text-secondary" style="font-size:16px;">psychology</span>
+            <span class="font-mono text-[11px] font-semibold uppercase tracking-widest text-primary">AI-Powered Insights</span>
+          </div>
+        </div>
 
-      <section class="mt-6 grid gap-6 lg:grid-cols-[1.45fr_0.9fr] lg:items-start">
-        <div class="rounded-[36px] border border-white/60 bg-white/78 p-3 shadow-[0_24px_80px_rgba(79,56,36,0.12)] backdrop-blur sm:p-4">
+        <!-- Feature cards -->
+        <div class="mt-6 glass-panel rounded-xl p-6 space-y-4">
+          <div class="flex items-start gap-3">
+            <div class="shrink-0 rounded-lg bg-secondary-container p-1.5 text-on-secondary-container">
+              <span class="material-symbols-outlined" style="font-size:20px;">check_circle</span>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-on-surface">个性化定制</p>
+              <p class="mt-0.5 text-sm text-on-surface-variant">上传简历有助于我们模拟真实的面试环节，AI 会围绕你的经历深度追问。</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="shrink-0 rounded-lg bg-secondary-container p-1.5 text-on-secondary-container">
+              <span class="material-symbols-outlined" style="font-size:20px;">description</span>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-on-surface">岗位精准匹配</p>
+              <p class="mt-0.5 text-sm text-on-surface-variant">填写岗位描述后，AI 将聚焦该职位的核心考察点，生成高质量题目。</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3">
+            <div class="shrink-0 rounded-lg bg-secondary-container p-1.5 text-on-secondary-container">
+              <span class="material-symbols-outlined" style="font-size:20px;">analytics</span>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-on-surface">面试结束即出报告</p>
+              <p class="mt-0.5 text-sm text-on-surface-variant">每次练习结束后自动生成评分报告与个性化改进建议。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Setup Form -->
+      <div class="lg:col-span-7">
+        <div class="glass-modal rounded-xl border border-outline-variant/10 shadow-[0_10px_30px_rgba(30,58,138,0.05)]">
           <FormSection
             :job-title="form.job_title"
             :experience-level="form.experience_level"
@@ -30,41 +87,82 @@
           />
         </div>
 
-        <div class="space-y-6">
-          <AiPreviewCard :highlights="setupPageMock.aiHighlights" :average-tip="setupPageMock.avgStartTip" />
-
-          <aside class="rounded-[32px] border border-white/60 bg-white/72 p-6 shadow-[0_24px_80px_rgba(79,56,36,0.12)] backdrop-blur">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-stone-500">Ready Check</p>
-            <div class="mt-5 space-y-4">
-              <div class="flex items-start gap-3 rounded-[22px] bg-[#fff8f1] px-4 py-4">
-                <span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full" :class="resumeFileName ? 'bg-emerald-500' : 'bg-amber-500'"></span>
-                <div>
-                  <p class="font-semibold text-stone-950">简历资料</p>
-                  <p class="mt-1 text-sm leading-7 text-stone-600">{{ resumeFileName ? `已上传 ${resumeFileName}` : '可选，但上传后 AI 能更准确追问项目经历。' }}</p>
-                </div>
-              </div>
-              <div class="flex items-start gap-3 rounded-[22px] bg-[#fff8f1] px-4 py-4">
-                <span class="mt-1 inline-flex h-2.5 w-2.5 rounded-full" :class="form.job_description.trim() ? 'bg-emerald-500' : 'bg-amber-500'"></span>
-                <div>
-                  <p class="font-semibold text-stone-950">岗位描述</p>
-                  <p class="mt-1 text-sm leading-7 text-stone-600">{{ form.job_description.trim() ? '已填写岗位说明，面试问题会更聚焦。' : '这是启动面试的必填项，建议写清技术栈与考察重点。' }}</p>
-                </div>
+        <!-- Ready Check -->
+        <div class="mt-4 rounded-xl border border-outline-variant/20 bg-surface-container-low p-4">
+          <p class="font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Ready Check</p>
+          <div class="mt-3 space-y-3">
+            <div class="flex items-start gap-3 rounded-lg bg-surface-container-lowest px-4 py-3">
+              <span
+                class="mt-1.5 inline-flex h-2 w-2 shrink-0 rounded-full"
+                :class="resumeFileName ? 'bg-secondary' : 'bg-outline-variant'"
+              ></span>
+              <div>
+                <p class="text-sm font-semibold text-on-surface">简历资料</p>
+                <p class="mt-0.5 text-sm text-on-surface-variant">
+                  {{ resumeFileName ? `已上传 ${resumeFileName}` : '可选，但上传后 AI 能更准确追问项目经历。' }}
+                </p>
               </div>
             </div>
-          </aside>
+            <div class="flex items-start gap-3 rounded-lg bg-surface-container-lowest px-4 py-3">
+              <span
+                class="mt-1.5 inline-flex h-2 w-2 shrink-0 rounded-full"
+                :class="form.job_description.trim() ? 'bg-secondary' : 'bg-outline-variant'"
+              ></span>
+              <div>
+                <p class="text-sm font-semibold text-on-surface">岗位描述</p>
+                <p class="mt-0.5 text-sm text-on-surface-variant">
+                  {{ form.job_description.trim() ? '已填写岗位说明，面试问题会更聚焦。' : '这是启动面试的必填项，建议写清技术栈与考察重点。' }}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-      </section>
+
+        <!-- Pro Tip -->
+        <div class="mt-4 flex items-start gap-4 glass-panel rounded-xl p-4 border border-secondary-container/30">
+          <div class="shrink-0 flex h-10 w-10 items-center justify-center rounded-lg bg-secondary-container text-on-secondary-container">
+            <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1; font-size:20px;">stars</span>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-primary">Pro Tip</p>
+            <p class="mt-0.5 text-sm leading-relaxed text-on-surface-variant">{{ setupPageMock.avgStartTip }}。高级职位面试默认包含系统设计与架构权衡题目。</p>
+          </div>
+        </div>
+      </div>
     </div>
   </main>
+
+  <!-- Mobile Bottom Nav -->
+  <nav
+    class="md:hidden fixed bottom-0 left-0 w-full z-50 bg-surface/80 backdrop-blur-lg border-t border-outline-variant/20 shadow-[0_-10px_30px_rgba(30,58,138,0.05)] rounded-t-xl flex justify-around items-center px-4 py-2"
+  >
+    <button
+      type="button"
+      class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 rounded-full transition hover:bg-surface-container-high"
+      @click="goHome"
+    >
+      <span class="material-symbols-outlined" style="font-size:22px;">home</span>
+      <span class="font-mono text-[10px] font-semibold uppercase tracking-wider mt-0.5">首页</span>
+    </button>
+    <div class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1">
+      <span class="material-symbols-outlined" style="font-size:22px;">video_chat</span>
+      <span class="font-mono text-[10px] font-semibold uppercase tracking-wider mt-0.5">面试</span>
+    </div>
+    <button
+      type="button"
+      class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 rounded-full transition hover:bg-surface-container-high"
+    >
+      <span class="material-symbols-outlined" style="font-size:22px;">analytics</span>
+      <span class="font-mono text-[10px] font-semibold uppercase tracking-wider mt-0.5">结果</span>
+    </button>
+  </nav>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import AiPreviewCard from '../components/setup/AiPreviewCard.vue'
 import FormSection from '../components/setup/FormSection.vue'
-import StepIndicator from '../components/setup/StepIndicator.vue'
 import { experienceLevelOptions, jobTitleOptions, modeOptions } from '../constants/interviewOptions'
 import { setupPageMock } from '../mock/interviewSetupMock'
 import { createInterviewSession, saveInterviewSetup, type InterviewSetupPayload } from '../utils/auth'
@@ -92,16 +190,6 @@ const resumeFileName = ref('')
 applyPrefillFromQuery()
 
 const isSubmitDisabled = computed(() => form.job_description.trim().length === 0)
-const experienceLevelLabel = computed(
-  () => experienceLevelOptions.find((option) => option.value === form.experience_level)?.label ?? '待选择',
-)
-const modeLabel = computed(() => modeOptions.find((option) => option.value === form.mode)?.label ?? '待选择')
-const resumeStatus = computed(() => (resumeFileName.value ? '简历已准备' : '等待上传简历'))
-const jobDescriptionStatus = computed(() =>
-  form.job_description.trim()
-    ? '岗位描述已补充，AI 可以围绕你的目标职位生成更聚焦的问题。'
-    : '还没有填写岗位描述，建议写明技术栈、职责范围和考察重点。',
-)
 
 function getSingleQueryValue(value: unknown): string | null {
   if (typeof value === 'string') return value
@@ -182,4 +270,3 @@ async function submitSetup() {
   }
 }
 </script>
-
