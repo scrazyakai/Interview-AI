@@ -1,6 +1,6 @@
 ﻿<template>
-  <div class="p-6 lg:p-8">
-    <form class="space-y-6" @submit.prevent="emit('submit')">
+  <div class="p-5 lg:p-6">
+    <form class="space-y-4" @submit.prevent="emit('submit')">
 
       <!-- Job Title -->
       <div class="space-y-1.5">
@@ -58,7 +58,7 @@
         </div>
         <textarea
           :value="jobDescription"
-          rows="5"
+          rows="4"
           maxlength="2000"
           :disabled="loading"
           class="w-full rounded-lg border border-outline-variant bg-white/50 p-6 text-sm leading-relaxed text-on-surface outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50 placeholder:text-outline"
@@ -71,7 +71,7 @@
       <div class="space-y-1.5">
         <label class="block font-mono text-xs font-semibold uppercase tracking-[0.05em] text-on-surface-variant">上传简历</label>
         <div
-          class="group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low p-6 transition-colors hover:bg-surface-container-high"
+          class="group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low p-4 transition-colors hover:bg-surface-container-high"
           :class="isDragOver ? 'border-primary bg-surface-container-high' : ''"
           @click="fileInputRef?.click()"
           @dragover.prevent="isDragOver = true"
@@ -83,9 +83,9 @@
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
             fill="currentColor"
-            class="mb-3 transition-colors"
-            style="width:36px;height:36px;"
-            :class="isDragOver ? 'text-primary' : 'text-outline group-hover:text-primary'"
+            class="mb-2 transition-colors"
+            style="width:28px;height:28px;"
+            :class="isDragOver ? 'text-primary' : resumeFileName ? 'text-secondary-container' : 'text-outline group-hover:text-primary'"
           ><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95A5.469 5.469 0 0 1 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11A2.98 2.98 0 0 1 22 15c0 1.65-1.35 3-3 3zM8 13h2.55v3h2.9v-3H16l-4-4z"/></svg>
           <p class="text-sm font-semibold text-primary">点击上传或拖拽文件</p>
           <p class="text-sm text-on-surface-variant">上传简历可提高题目质量</p>
@@ -97,8 +97,8 @@
       <p v-if="errorMessage" class="rounded-lg border border-error-container bg-error-container/50 px-4 py-3 text-sm text-on-error-container">{{ errorMessage }}</p>
 
       <!-- Ready Check & Submit -->
-      <div class="border-t border-outline-variant/20 pt-6">
-        <div class="flex flex-col gap-6 rounded-xl bg-surface-container-highest/30 p-6 md:flex-row md:items-center md:justify-between">
+      <div class="border-t border-outline-variant/20 pt-4">
+        <div class="flex flex-col gap-4 rounded-xl bg-surface-container-highest/30 p-4 md:flex-row md:items-center md:justify-between">
           <div class="flex items-center gap-3">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary-container text-on-secondary-container">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:20px;height:20px;"><path d="M6 15c-.83 0-1.58.34-2.12.88C2.7 17.06 2 22 2 22s4.94-.7 6.12-1.88A2.996 2.996 0 0 0 6 15zm.71 3.71c-.28.28-2.17.76-2.17.76s.47-1.88.76-2.17c.17-.19.42-.3.7-.3a1.003 1.003 0 0 1 .71 1.71zm10.71-5.06c6.36-6.36 4.24-11.31 4.24-11.31S16.71.22 10.35 6.58l-2.49-.5a2.03 2.03 0 0 0-1.81.55L2 10.69l5 2.14L11.17 17l2.14 5 4.05-4.05c.47-.47.68-1.15.55-1.81l-.49-2.49zM7.41 10.83l-1.91-.82 1.97-1.97 1.44.29c-.57.83-1.08 1.7-1.5 2.5zm6.58 7.67-.82-1.91c.8-.42 1.67-.93 2.49-1.5l.29 1.44-1.96 1.97zM16 12.24c-1.32 1.32-3.38 2.4-4.04 2.73l-2.93-2.93c.32-.65 1.4-2.71 2.73-4.04 4.68-4.68 8.23-3.99 8.23-3.99s.69 3.55-3.99 8.23zM15 11c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>

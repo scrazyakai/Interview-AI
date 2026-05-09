@@ -1,20 +1,20 @@
 ﻿<template>
-  <main class="px-6 pb-20 pt-24 lg:px-12 lg:pb-24 max-w-[1280px] mx-auto">
-    <div class="grid grid-cols-1 gap-12 lg:grid-cols-12 lg:items-start">
+  <main class="px-6 pt-16 lg:px-12 max-w-[1280px] mx-auto h-screen overflow-hidden flex flex-col">
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-12 flex-1 overflow-hidden py-3">
       <!-- Left Column: Intro & Feature Cards -->
-      <div class="lg:col-span-5 flex flex-col justify-center">
+      <div class="lg:col-span-5 flex flex-col overflow-y-auto h-full pr-1">
         <p class="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-secondary">
           Interview Setup
         </p>
-        <h1 class="mt-4 text-4xl font-bold leading-tight tracking-tight text-primary lg:text-5xl">
+        <h1 class="mt-2 text-3xl font-bold leading-tight tracking-tight text-primary lg:text-4xl">
           设置您的面试
         </h1>
-        <p class="mt-4 text-lg leading-relaxed text-on-surface-variant">
+        <p class="mt-2 text-base leading-relaxed text-on-surface-variant">
           配置您的会话，以获得针对您的目标角色和经验水平定制的高保真 AI 反馈。
         </p>
 
         <!-- Hero image card -->
-        <div class="relative mt-8 w-full overflow-hidden rounded-xl shadow-xl aspect-video glass-panel">
+        <div class="relative mt-4 w-full overflow-hidden rounded-xl shadow-xl aspect-video glass-panel">
           <img
             src="../assets/AI-Power-Insight.png"
             alt="AI 面试助手"
@@ -30,7 +30,7 @@
         </div>
 
         <!-- Feature cards -->
-        <div class="mt-6 glass-panel rounded-xl p-6 space-y-4">
+        <div class="mt-3 glass-panel rounded-xl p-4 space-y-3">
           <div class="flex items-start gap-3">
             <div class="shrink-0 rounded-lg bg-secondary-container p-1.5 text-on-secondary-container">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:20px;height:20px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.88-11.71L10 14.17l-1.88-1.88a.996.996 0 1 0-1.41 1.41l2.59 2.59c.39.39 1.02.39 1.41 0L17.3 9.7a.996.996 0 0 0 0-1.41c-.39-.39-1.03-.39-1.42 0z"></path></svg>
@@ -62,7 +62,7 @@
       </div>
 
       <!-- Right Column: Setup Form -->
-      <div class="lg:col-span-7">
+      <div class="lg:col-span-7 overflow-y-auto h-full">
         <div class="glass-modal rounded-xl border border-outline-variant/10 shadow-[0_10px_30px_rgba(30,58,138,0.05)]">
           <FormSection
             :job-title="form.job_title"
@@ -85,37 +85,6 @@
             @back="goHome"
             @submit="submitSetup"
           />
-        </div>
-
-        <!-- Ready Check -->
-        <div class="mt-4 rounded-xl border border-outline-variant/20 bg-surface-container-low p-4">
-          <p class="font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-on-surface-variant">Ready Check</p>
-          <div class="mt-3 space-y-3">
-            <div class="flex items-start gap-3 rounded-lg bg-surface-container-lowest px-4 py-3">
-              <span
-                class="mt-1.5 inline-flex h-2 w-2 shrink-0 rounded-full"
-                :class="resumeFileName ? 'bg-secondary' : 'bg-outline-variant'"
-              ></span>
-              <div>
-                <p class="text-sm font-semibold text-on-surface">简历资料</p>
-                <p class="mt-0.5 text-sm text-on-surface-variant">
-                  {{ resumeFileName ? `已上传 ${resumeFileName}` : '可选，但上传后 AI 能更准确追问项目经历。' }}
-                </p>
-              </div>
-            </div>
-            <div class="flex items-start gap-3 rounded-lg bg-surface-container-lowest px-4 py-3">
-              <span
-                class="mt-1.5 inline-flex h-2 w-2 shrink-0 rounded-full"
-                :class="form.job_description.trim() ? 'bg-secondary' : 'bg-outline-variant'"
-              ></span>
-              <div>
-                <p class="text-sm font-semibold text-on-surface">岗位描述</p>
-                <p class="mt-0.5 text-sm text-on-surface-variant">
-                  {{ form.job_description.trim() ? '已填写岗位说明，面试问题会更聚焦。' : '这是启动面试的必填项，建议写清技术栈与考察重点。' }}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
       </div>
