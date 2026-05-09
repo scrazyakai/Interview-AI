@@ -260,8 +260,8 @@ onUnmounted(() => {
               @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
               @click="handleLogout"
             >
-              <svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;color:#d81e06;flex-shrink:0;">
-                <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;color:#d81e06;flex-shrink:0;">
+                <path d="m17 7-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"></path>
               </svg>
               <span style="font-size:14px;font-weight:600;color:#d81e06;">退出登录</span>
             </button>

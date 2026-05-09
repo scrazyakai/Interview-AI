@@ -77,6 +77,23 @@ const totalPoints = computed(() => {
 const totalPages = computed(() => Math.max(1, Math.ceil(totalRecordCount.value / PAGE_SIZE)))
 const pageStart = computed(() => (totalRecordCount.value === 0 ? 0 : (currentPage.value - 1) * PAGE_SIZE + 1))
 const pageEnd = computed(() => Math.min(currentPage.value * PAGE_SIZE, totalRecordCount.value))
+const resumeFileName = computed(() => {
+  const data = profileData.value
+  if (!data) return ''
+
+  const directName = data.resume_file_name ?? data.resume_filename ?? data.cv_file_name
+  if (typeof directName === 'string' && directName.trim()) return directName.trim()
+
+  const fileUrl = data.resume_url ?? data.resume_file_url ?? data.cv_url
+  if (typeof fileUrl === 'string' && fileUrl.trim()) {
+    const normalized = fileUrl.split('?')[0]?.split('#')[0] ?? fileUrl
+    const fileName = normalized.split('/').pop() ?? ''
+    return fileName.trim()
+  }
+
+  return ''
+})
+const hasResume = computed(() => resumeFileName.value.length > 0)
 
 const profileFields = computed<ProfileField[]>(() => {
   const data = profileData.value ?? {}
@@ -210,10 +227,6 @@ function formatDateTime(value?: string) {
   }).format(date)
 }
 
-function goHome() {
-  router.push('/')
-}
-
 function logout() {
   clearAuthSession()
   router.push('/')
@@ -276,31 +289,6 @@ async function goToPage(page: number) {
 
 <template>
   <div class="min-h-screen pb-32" style="background-color: #f8f9ff; color: #0b1c30;">
-
-    <!-- TopAppBar -->
-    <header class="fixed top-0 z-50 w-full h-16 flex justify-between items-center px-6"
-            style="background: rgba(248,249,255,0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid rgba(197,197,211,0.2); box-shadow: 0 1px 4px rgba(30,58,138,0.04);">
-      <div class="flex items-center gap-3 cursor-pointer" @click="goHome">
-        <span class="material-symbols-outlined" style="color: #00236f;">menu</span>
-        <h1 class="font-bold text-2xl leading-tight" style="color: #00236f; font-family: 'Inter', sans-serif;">InterviewAI</h1>
-      </div>
-      <div class="flex items-center gap-6">
-        <div class="hidden md:flex gap-6 items-center">
-          <RouterLink to="/" class="text-xs font-semibold tracking-widest uppercase transition-colors px-2 py-1 rounded"
-                      style="font-family: 'JetBrains Mono', monospace; color: #444651;">首页</RouterLink>
-          <RouterLink to="/interview/setup" class="text-xs font-semibold tracking-widest uppercase transition-colors px-2 py-1 rounded"
-                      style="font-family: 'JetBrains Mono', monospace; color: #444651;">面试</RouterLink>
-          <RouterLink to="/results" class="text-xs font-semibold tracking-widest uppercase transition-colors px-2 py-1 rounded"
-                      style="font-family: 'JetBrains Mono', monospace; color: #444651;">结果</RouterLink>
-          <RouterLink to="/profile" class="text-xs font-semibold tracking-widest uppercase px-2 py-1 rounded font-bold"
-                      style="font-family: 'JetBrains Mono', monospace; color: #00236f;">个人中心</RouterLink>
-        </div>
-        <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center" style="background-color: #1e3a8a;">
-          <span class="font-bold text-sm" style="color: #90a8ff; font-family: 'Inter', sans-serif;">{{ userInitial }}</span>
-        </div>
-      </div>
-    </header>
-
     <!-- Loading State -->
     <div v-if="profileLoading" class="flex items-center justify-center min-h-screen">
       <div class="text-center">
@@ -344,7 +332,9 @@ async function goToPage(page: number) {
           <!-- Verified Badge -->
           <div class="absolute bottom-0 right-0 p-1 rounded-full"
                style="background-color: #006c49; border: 2px solid #ffffff;">
-            <span class="material-symbols-outlined" style="font-size: 18px; color: #ffffff; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">verified</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;color:#ffffff;display:block;">
+              <path d="m23 12-2.44-2.79.34-3.69-3.61-.82-1.89-3.2L12 2.96 8.6 1.5 6.71 4.69 3.1 5.5l.34 3.7L1 12l2.44 2.79-.34 3.7 3.61.82L8.6 22.5l3.4-1.47 3.4 1.46 1.89-3.19 3.61-.82-.34-3.69L23 12zm-12.91 4.72-3.8-3.81 1.48-1.48 2.32 2.33 5.85-5.87 1.48 1.48-7.33 7.35z"></path>
+            </svg>
           </div>
         </div>
 
@@ -367,13 +357,17 @@ async function goToPage(page: number) {
           <RouterLink to="/interview/setup"
                       class="flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all active:scale-95 whitespace-nowrap"
                       style="background-color: #00236f; color: #ffffff; font-family: 'Inter', sans-serif; font-size: 16px; line-height: 1;">
-            <span class="material-symbols-outlined">add_circle</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;flex-shrink:0;">
+              <path d="M13 7h-2v4H7v2h4v4h2v-4h4v-2h-4V7zm-1-5C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path>
+            </svg>
             开始新面试
           </RouterLink>
           <RouterLink to="/results"
                       class="flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all active:scale-95 whitespace-nowrap"
                       style="background: transparent; border: 1px solid #00236f; color: #00236f; font-family: 'Inter', sans-serif; font-size: 16px; line-height: 1;">
-            <span class="material-symbols-outlined">history</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;flex-shrink:0;">
+              <path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"></path>
+            </svg>
             查看详细历史
           </RouterLink>
         </div>
@@ -385,7 +379,9 @@ async function goToPage(page: number) {
         <div class="rounded-xl p-6 flex items-center gap-6"
              style="background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(30,58,138,0.05);">
           <div class="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style="background-color: #dce1ff; color: #00236f;">
-            <span class="material-symbols-outlined" style="font-size: 32px;">video_chat</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:32px;height:32px;">
+              <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-3 11-2-1.99V13c0 .55-.45 1-1 1H8c-.55 0-1-.45-1-1V7c0-.55.45-1 1-1h6c.55 0 1 .45 1 1v1.99L17 7v6z"></path>
+            </svg>
           </div>
           <div>
             <p class="text-xs font-semibold tracking-widest uppercase mb-1" style="font-family: 'JetBrains Mono', monospace; color: #444651;">总面试次数</p>
@@ -397,7 +393,10 @@ async function goToPage(page: number) {
         <div class="rounded-xl p-6 flex items-center gap-6"
              style="background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(30,58,138,0.05);">
           <div class="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style="background-color: #6cf8bb; color: #006c49;">
-            <span class="material-symbols-outlined" style="font-size: 32px;">analytics</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:32px;height:32px;">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"></path>
+              <path d="M7 12h2v5H7zm8-5h2v10h-2zm-4 7h2v3h-2zm0-4h2v2h-2z"></path>
+            </svg>
           </div>
           <div>
             <p class="text-xs font-semibold tracking-widest uppercase mb-1" style="font-family: 'JetBrains Mono', monospace; color: #444651;">当前积分</p>
@@ -411,7 +410,9 @@ async function goToPage(page: number) {
         <div class="rounded-xl p-6 flex items-center gap-6"
              style="background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.3); border: 2px solid rgba(0,35,111,0.1); box-shadow: 0 10px 30px rgba(30,58,138,0.05);">
           <div class="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style="background-color: #e1e0ff; color: #0d0097;">
-            <span class="material-symbols-outlined" style="font-size: 32px;">military_tech</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:32px;height:32px;">
+              <path d="M17 10.43V2H7v8.43c0 .35.18.68.49.86l4.18 2.51-.99 2.34-3.41.29 2.59 2.24L9.07 22 12 20.23 14.93 22l-.78-3.33 2.59-2.24-3.41-.29-.99-2.34 4.18-2.51c.3-.18.48-.5.48-.86zm-6 .64-2-1.2V4h2v7.07zm4-1.2-2 1.2V4h2v5.87z"></path>
+            </svg>
           </div>
           <div>
             <p class="text-xs font-semibold tracking-widest uppercase mb-1" style="font-family: 'JetBrains Mono', monospace; color: #444651;">积分记录条数</p>
@@ -427,7 +428,10 @@ async function goToPage(page: number) {
           <!-- Card Header -->
           <div class="p-6 flex justify-between items-center" style="border-bottom: 1px solid rgba(197,197,211,0.2);">
             <h3 class="font-semibold flex items-center gap-3" style="font-family: 'Inter', sans-serif; font-size: 24px; line-height: 1.3; color: #0b1c30;">
-              <span class="material-symbols-outlined" style="color: #00236f;">receipt_long</span>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:22px;height:22px;color:#00236f;flex-shrink:0;">
+                <path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2v14H3v3c0 1.66 1.34 3 3 3h12c1.66 0 3-1.34 3-3V2l-1.5 1.5zM15 20H6c-.55 0-1-.45-1-1v-1h10v2zm4-1c0 .55-.45 1-1 1s-1-.45-1-1v-3H8V5h11v14z"></path>
+                <path d="M9 7h6v2H9zm7 0h2v2h-2zm-7 3h6v2H9zm7 0h2v2h-2z"></path>
+              </svg>
               积分记录
             </h3>
             <span class="text-sm font-semibold" style="color: #00236f; font-family: 'Inter', sans-serif; cursor: pointer;">
@@ -446,8 +450,11 @@ async function goToPage(page: number) {
               <div class="flex items-center gap-6">
                 <!-- Icon -->
                 <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style="background-color: #d3e4fe;">
-                  <span class="material-symbols-outlined" style="color: #00236f; font-size: 20px;">
-                    {{ record.sign === 'positive' ? 'add_circle' : record.sign === 'negative' ? 'remove_circle' : 'circle' }}
+                  <svg v-if="record.sign === 'positive'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:20px;height:20px;color:#00236f;">
+                    <path d="M13 7h-2v4H7v2h4v4h2v-4h4v-2h-4V7zm-1-5C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"></path>
+                  </svg>
+                  <span v-else class="material-symbols-outlined" style="color: #00236f; font-size: 20px;">
+                    {{ record.sign === 'negative' ? 'remove_circle' : 'circle' }}
                   </span>
                 </div>
                 <!-- Info -->
@@ -471,14 +478,19 @@ async function goToPage(page: number) {
                     {{ formatChangePoint(record.changePoint) }}
                   </p>
                 </div>
-                <span class="material-symbols-outlined" style="color: #757682;">chevron_right</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;color:#757682;flex-shrink:0;">
+                  <path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"></path>
+                </svg>
               </div>
             </div>
           </div>
 
           <!-- Empty State -->
           <div v-else class="p-12 text-center">
-            <span class="material-symbols-outlined mb-4 block" style="font-size: 48px; color: #c5c5d3;">receipt_long</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:48px;height:48px;color:#c5c5d3;display:block;margin:0 auto 16px;">
+              <path d="M19.5 3.5 18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2v14H3v3c0 1.66 1.34 3 3 3h12c1.66 0 3-1.34 3-3V2l-1.5 1.5zM15 20H6c-.55 0-1-.45-1-1v-1h10v2zm4-1c0 .55-.45 1-1 1s-1-.45-1-1v-3H8V5h11v14z"></path>
+              <path d="M9 7h6v2H9zm7 0h2v2h-2zm-7 3h6v2H9zm7 0h2v2h-2z"></path>
+            </svg>
             <p style="font-family: 'Inter', sans-serif; color: #757682;">暂无积分记录。</p>
           </div>
 
@@ -521,14 +533,20 @@ async function goToPage(page: number) {
         <div class="rounded-xl p-6"
              style="background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(30,58,138,0.05);">
           <h3 class="font-semibold flex items-center gap-2 mb-6" style="font-family: 'Inter', sans-serif; font-size: 16px; line-height: 1.6; color: #0b1c30;">
-            <span class="material-symbols-outlined" style="color: #00236f;">description</span>
+            <svg t="1778306048835" class="icon" viewBox="0 0 1707 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" style="width:18px;height:18px;flex-shrink:0;">
+              <path d="M496.4356 44.505433c-26.753266 0-44.505433 17.752167-44.505433 44.505433v845.978268c0 26.753266 17.752167 44.505433 44.505433 44.505433H1208.897571c26.753266 0 44.505433-17.752167 44.505432-44.505433V89.135881c0-26.753266-17.752167-44.505433-44.505432-44.505433H496.4356z m0-44.505433H1208.897571c49.005982 0 89.010866 40.129899 89.010865 89.010866v845.978268c0 49.005982-40.129899 89.010866-89.010865 89.010866H496.4356c-49.005982 0-89.010866-40.129899-89.010866-89.010866V89.135881c0-49.005982 40.004883-89.135881 89.010866-89.135881z m0 0" fill="#61C6F1"></path>
+              <path d="M696.835063 578.820657c0 13.376633-8.876084 22.252716-22.252717 22.252716-13.376633 0-22.252716-8.876084-22.252716-22.252716 0-120.264681 75.634233-244.904896 200.399463-244.904896 124.640215 0 191.523379 115.764131 191.523379 244.904896 0 13.376633-8.876084 22.252716-22.252716 22.252716-13.376633 0-22.252716-8.876084-22.252717-22.252716 0-106.888048-53.381516-200.399463-146.892931-200.399463-93.63643 0.125015-156.019045 102.512514-156.019045 200.399463z m0 0" fill="#999999"></path>
+              <path d="M852.729093 378.546209c-62.382615 0-111.263582-49.005982-111.263582-111.263582 0-62.382615 49.005982-111.263582 111.263582-111.263582 62.382615 0 111.263582 49.005982 111.263582 111.263582s-49.005982 111.263582-111.263582 111.263582z m0-44.630448c35.629349 0 66.758149-31.1288 66.758149-66.758149s-31.1288-66.758149-66.758149-66.758149-66.758149 31.1288-66.758149 66.758149c-0.125015 35.629349 31.1288 66.758149 66.758149 66.758149zM563.193749 712.46197c-13.376633 0-22.252716-8.876084-22.252716-22.252716 0-13.376633 8.876084-22.252716 22.252716-22.252716H1097.633989c13.376633 0 22.252716 8.876084 22.252716 22.252716 0 13.376633-8.876084 22.252716-22.252716 22.252716H563.193749z m0 133.516299c-13.376633 0-22.252716-8.876084-22.252716-22.252717 0-13.376633 8.876084-22.252716 22.252716-22.252716H1097.633989c13.376633 0 22.252716 8.876084 22.252716 22.252716 0 13.376633-8.876084 22.252716-22.252716 22.252717H563.193749z m0 0" fill="#999999"></path>
+            </svg>
             简历管理
           </h3>
           <div class="rounded-lg p-6 text-center mb-6"
                style="background-color: #ffffff; border: 2px dashed #c5c5d3;">
-            <span class="material-symbols-outlined mb-2 block" style="font-size: 40px; color: rgba(0,35,111,0.3);">cloud_upload</span>
-            <p class="font-semibold text-sm mb-1" style="font-family: 'Inter', sans-serif; color: #0b1c30;">Standard_Resume_2023.pdf</p>
-            <p class="text-xs" style="font-family: 'Inter', sans-serif; color: #444651;">Last uploaded: 2 days ago</p>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="mb-2 block mx-auto transition-colors" style="width:40px;height:40px;" :style="{ color: hasResume ? '#006c49' : 'rgba(0,35,111,0.3)' }">
+              <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95A5.469 5.469 0 0 1 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11A2.98 2.98 0 0 1 22 15c0 1.65-1.35 3-3 3zM8 13h2.55v3h2.9v-3H16l-4-4z"></path>
+            </svg>
+            <p class="font-semibold text-sm mb-1" style="font-family: 'Inter', sans-serif; color: #0b1c30;">{{ resumeFileName || 'Standard_Resume_2023.pdf' }}</p>
+            <p class="text-xs" style="font-family: 'Inter', sans-serif; color: #444651;">{{ hasResume ? 'Resume on file' : 'No resume uploaded yet' }}</p>
           </div>
           <div class="flex flex-col gap-2">
             <button class="w-full py-2 rounded-lg text-sm font-semibold transition-colors"
@@ -567,7 +585,9 @@ async function goToPage(page: number) {
         <button @click="logout"
                 class="w-full flex items-center justify-center gap-2 py-3 rounded-lg font-semibold transition-all active:scale-95"
                 style="background: transparent; border: 1px solid rgba(186,26,26,0.3); color: #ba1a1a; font-family: 'Inter', sans-serif; font-size: 16px; line-height: 1;">
-          <span class="material-symbols-outlined">logout</span>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;flex-shrink:0;">
+            <path d="m17 7-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"></path>
+          </svg>
           退出登录
         </button>
       </aside>
@@ -582,11 +602,16 @@ async function goToPage(page: number) {
         <span class="text-xs font-semibold tracking-widest" style="font-family: 'JetBrains Mono', monospace;">首页</span>
       </RouterLink>
       <RouterLink to="/interview/setup" class="flex flex-col items-center justify-center py-1 px-4 transition-all" style="color: #444651;">
-        <span class="material-symbols-outlined">video_chat</span>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:24px;height:24px;">
+          <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-3 11-2-1.99V13c0 .55-.45 1-1 1H8c-.55 0-1-.45-1-1V7c0-.55.45-1 1-1h6c.55 0 1 .45 1 1v1.99L17 7v6z"></path>
+        </svg>
         <span class="text-xs font-semibold tracking-widest" style="font-family: 'JetBrains Mono', monospace;">面试</span>
       </RouterLink>
       <RouterLink to="/results" class="flex flex-col items-center justify-center py-1 px-4 transition-all" style="color: #444651;">
-        <span class="material-symbols-outlined">analytics</span>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:24px;height:24px;">
+          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"></path>
+          <path d="M7 12h2v5H7zm8-5h2v10h-2zm-4 7h2v3h-2zm0-4h2v2h-2z"></path>
+        </svg>
         <span class="text-xs font-semibold tracking-widest" style="font-family: 'JetBrains Mono', monospace;">结果</span>
       </RouterLink>
       <RouterLink to="/profile" class="flex flex-col items-center justify-center py-1 px-4 rounded-full transition-all" style="background-color: #1e3a8a; color: #90a8ff;">

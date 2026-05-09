@@ -43,26 +43,6 @@ const qaItems = [
 
 <template>
   <div class="min-h-screen pb-32" style="background-color: #f8f9ff; color: #0b1c30;">
-    <!-- TopAppBar -->
-    <header class="fixed top-0 w-full z-50 h-16 flex justify-between items-center px-6"
-            style="background: rgba(248,249,255,0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid rgba(197,197,211,0.2); box-shadow: 0 1px 4px rgba(30,58,138,0.04);">
-      <div class="flex items-center gap-3 cursor-pointer">
-        <span class="material-symbols-outlined" style="color: #00236f;">menu</span>
-        <span class="font-bold text-2xl leading-tight" style="color: #00236f; font-family: 'Inter', sans-serif;">InterviewAI</span>
-      </div>
-      <div class="flex items-center gap-6">
-        <nav class="hidden md:flex gap-6 items-center">
-          <RouterLink to="/" class="text-base transition-colors px-3 py-1 rounded-full" style="font-family: 'Inter', sans-serif; color: #444651;">首页</RouterLink>
-          <RouterLink to="/interview/setup" class="text-base transition-colors px-3 py-1 rounded-full" style="font-family: 'Inter', sans-serif; color: #444651;">面试</RouterLink>
-          <RouterLink to="/results" class="text-2xl font-semibold px-3 py-1 rounded-full" style="font-family: 'Inter', sans-serif; color: #00236f;">结果</RouterLink>
-          <RouterLink to="/profile" class="text-base transition-colors px-3 py-1 rounded-full" style="font-family: 'Inter', sans-serif; color: #444651;">设置</RouterLink>
-        </nav>
-        <div class="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center" style="background-color: #1e3a8a;">
-          <span class="font-bold text-sm" style="color: #90a8ff; font-family: 'Inter', sans-serif;">A</span>
-        </div>
-      </div>
-    </header>
-
     <main class="max-w-screen-xl mx-auto px-6 pt-24 pb-12">
 
       <!-- Summary Header -->
