@@ -1,16 +1,5 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-
-import AppTopbar from '../components/AppTopbar.vue'
-import { clearAuthSession } from '../utils/auth'
 import InterviewSetupPage from './InterviewSetupPage.vue'
-
-const router = useRouter()
-
-function logout() {
-  clearAuthSession()
-  router.push('/')
-}
 </script>
 
 <template>
@@ -25,7 +14,6 @@ function logout() {
       "
     ></div>
     <div class="relative z-10">
-      <AppTopbar @logout="logout" />
       <InterviewSetupPage />
     </div>
   </div>

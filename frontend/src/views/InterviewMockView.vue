@@ -4,8 +4,6 @@
     <div class="interview-deck__glow interview-deck__glow--right"></div>
 
     <div class="interview-deck__shell">
-      <AppTopbar @logout="logout" />
-
       <div class="mainContainer mainContainer--compact">
         <section class="chatSection">
           <div class="chatSection__header">
@@ -138,9 +136,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import AppTopbar from '../components/AppTopbar.vue'
 import {
-  clearAuthSession,
   loadAuthSession,
   loadInterviewSetup,
   getInterviewWebSocketUrl,
@@ -238,11 +234,6 @@ let activeAssistantMessageId: number | null = null
 let activeUserTranscriptMessageId: number | null = null
 let isIntentionalSocketClose = false
 let pendingPcmBytes = new Uint8Array(0)
-
-function logout() {
-  clearAuthSession()
-  router.push('/')
-}
 
 function appendMessage(role: ChatMessage['role'], text: string) {
   messages.value.push({

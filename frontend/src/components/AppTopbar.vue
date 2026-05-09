@@ -1,203 +1,290 @@
-﻿<script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-
-import { loadAuthSession, type TokenResponse } from '../utils/auth'
-
-const props = defineProps<{
-  onHome?: boolean
-}>()
-
-const emit = defineEmits<{
-  login: []
-  register: []
-  logout: []
-}>()
+import { loadAuthSession, clearAuthSession, type TokenResponse } from '../utils/auth'
+import LoginModal from './LoginModal.vue'
+import RegisterModal from './RegisterModal.vue'
 
 const router = useRouter()
 const route = useRoute()
-const userMenuOpen = ref(false)
-const internalSession = ref<TokenResponse | null>(null)
 
-const currentSession = computed(() => internalSession.value)
-const userInitial = computed(() => currentSession.value?.username.slice(0, 1).toUpperCase() ?? 'U')
-const isHomeRoute = computed(() => route.path === '/')
-const isInterviewRoute = computed(() => route.path.startsWith('/interview'))
-const isAboutRoute = computed(() => route.path === '/about')
+const session = ref<TokenResponse | null>(loadAuthSession())
+const showLoginModal = ref(false)
+const showRegisterModal = ref(false)
+const dropdownVisible = ref(false)
+let hideTimer: ReturnType<typeof setTimeout> | null = null
 
+// Keep session in sync after login / logout events from other parts of the app
 function syncSession() {
-  internalSession.value = loadAuthSession()
+  session.value = loadAuthSession()
 }
 
-function handleDocumentClick(event: MouseEvent) {
-  const target = event.target
-  if (!(target instanceof HTMLElement)) return
-  if (!target.closest('.user-menu')) {
-    userMenuOpen.value = false
-  }
+function onLoginSuccess() {
+  session.value = loadAuthSession()
 }
 
-function toggleUserMenu() {
-  userMenuOpen.value = !userMenuOpen.value
+function onRegisterSuccess() {
+  session.value = loadAuthSession()
 }
 
-function goHome() {
+// --- Hover dropdown logic ---
+function showDropdown() {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+  dropdownVisible.value = true
+}
+
+function scheduleHide() {
+  hideTimer = setTimeout(() => {
+    dropdownVisible.value = false
+  }, 150)
+}
+
+// ---  Actions ---
+function handleLogout() {
+  dropdownVisible.value = false
+  clearAuthSession()
+  session.value = null
   router.push('/')
-}
-
-function goInterview() {
-  router.push('/interview/setup')
-}
-
-function goAbout() {
-  router.push('/about')
 }
 
 function goProfile() {
-  userMenuOpen.value = false
+  dropdownVisible.value = false
   router.push('/profile')
 }
 
-function handleLogin() {
-  if (props.onHome) {
-    emit('login')
-    return
-  }
-
-  router.push('/')
-}
-
-function handleRegister() {
-  if (props.onHome) {
-    emit('register')
-    return
-  }
-
-  router.push('/')
-}
-
-function handleLogout() {
-  userMenuOpen.value = false
-  emit('logout')
-}
-
-watch(
-  () => route.fullPath,
-  () => {
-    userMenuOpen.value = false
-    syncSession()
-  },
-)
-
+// Sync session on every route navigation (handles login redirect flows)
 onMounted(() => {
   syncSession()
-  document.addEventListener('click', handleDocumentClick)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleDocumentClick)
+  if (hideTimer) clearTimeout(hideTimer)
 })
 </script>
 
 <template>
-  <header class="bg-surface/80 backdrop-blur-md border-b border-outline-variant/20 shadow-sm fixed top-0 left-0 w-full z-50 h-16 flex justify-between items-center px-6">
+  <!-- ===== Fixed Topbar ===== -->
+  <header
+    style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 64px;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 24px;
+      box-sizing: border-box;
+      background: rgba(248,249,255,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(197,197,211,0.2);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    "
+  >
     <!-- Brand -->
-    <button
-      type="button"
-      class="flex items-center gap-2 cursor-pointer active:scale-95 duration-200"
-      @click="goHome"
-    >
-      <svg viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-primary" style="width:24px;height:24px;"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 3C1.22386 3 1 3.22386 1 3.5C1 3.77614 1.22386 4 1.5 4H13.5C13.7761 4 14 3.77614 14 3.5C14 3.22386 13.7761 3 13.5 3H1.5ZM1 7.5C1 7.22386 1.22386 7 1.5 7H13.5C13.7761 7 14 7.22386 14 7.5C14 7.77614 13.7761 8 13.5 8H1.5C1.22386 8 1 7.77614 1 7.5ZM1 11.5C1 11.2239 1.22386 11 1.5 11H13.5C13.7761 11 14 11.2239 14 11.5C14 11.7761 13.7761 12 13.5 12H1.5C1.22386 12 1 11.7761 1 11.5Z" fill="currentColor"></path></svg>
-      <span class="font-bold text-xl text-primary" style="font-family: 'Inter', sans-serif;">InterviewAI</span>
-    </button>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+           style="width:20px;height:20px;color:#00236f;transform:matrix(-1,0,0,1,0,0);">
+        <path d="M13 8.57a1.43 1.43 0 1 0 0 2.86 1.43 1.43 0 0 0 0-2.86z"/>
+        <path d="M13 3C9.25 3 6.2 5.94 6.02 9.64L4.1 12.2a.5.5 0 0 0 .4.8H6v3c0 1.1.9 2 2 2h1v3h7v-4.68A6.999 6.999 0 0 0 13 3zm3 7c0 .13-.01.26-.02.39l.83.66c.08.06.1.16.05.25l-.8 1.39c-.05.09-.16.12-.24.09l-.99-.4c-.21.16-.43.29-.67.39L14 13.83c-.01.1-.1.17-.2.17h-1.6c-.1 0-.18-.07-.2-.17l-.15-1.06c-.25-.1-.47-.23-.68-.39l-.99.4c-.09.03-.2 0-.25-.09l-.8-1.39a.19.19 0 0 1 .05-.25l.84-.66c-.01-.13-.02-.26-.02-.39s.02-.27.04-.39l-.85-.66c-.08-.06-.1-.16-.05-.26l.8-1.38c.05-.09.15-.12.24-.09l1 .4c.2-.15.43-.29.67-.39L12 6.17c.02-.1.1-.17.2-.17h1.6c.1 0 .18.07.2.17l.15 1.06c.24.1.46.23.67.39l1-.4c.09-.03.2 0 .24.09l.8 1.38a.2.2 0 0 1-.05.26l-.85.66c.03.12.04.25.04.39z"/>
+      </svg>
+      <RouterLink
+        to="/"
+        style="font-weight:700;font-size:20px;color:#00236f;text-decoration:none;font-family:'Inter',sans-serif;"
+      >InterviewAI</RouterLink>
+    </div>
 
-    <!-- Desktop Nav -->
-    <nav class="hidden md:flex items-center gap-6">
-      <button
-        type="button"
-        class="text-sm transition-colors px-2 py-1 rounded"
-        style="font-family: 'Inter', sans-serif;"
-        :class="isHomeRoute ? 'font-semibold text-primary' : 'text-on-surface-variant hover:bg-primary-container/10'"
-        @click="goHome"
-      >首页</button>
-      <button
-        type="button"
-        class="text-sm transition-colors px-2 py-1 rounded"
-        style="font-family: 'Inter', sans-serif;"
-        :class="isInterviewRoute ? 'font-semibold text-primary' : 'text-on-surface-variant hover:bg-primary-container/10'"
-        @click="goInterview"
-      >面试</button>
-      <button
-        type="button"
-        class="text-sm transition-colors px-2 py-1 rounded"
-        style="font-family: 'Inter', sans-serif;"
-        :class="isAboutRoute ? 'font-semibold text-primary' : 'text-on-surface-variant hover:bg-primary-container/10'"
-        @click="goAbout"
-      >结果</button>
+    <!-- Desktop Nav links -->
+    <nav style="display: flex; align-items: center; gap: 24px;">
+      <RouterLink
+        to="/"
+        style="font-size:14px;text-decoration:none;font-family:'Inter',sans-serif;transition:color 0.15s;"
+        :style="{
+          color: route.path === '/' ? '#00236f' : '#444651',
+          fontWeight: route.path === '/' ? '600' : '400',
+        }"
+      >首页</RouterLink>
+      <RouterLink
+        to="/interview/setup"
+        style="font-size:14px;text-decoration:none;font-family:'Inter',sans-serif;transition:color 0.15s;"
+        :style="{
+          color: route.path.startsWith('/interview') ? '#00236f' : '#444651',
+          fontWeight: route.path.startsWith('/interview') ? '600' : '400',
+        }"
+      >面试</RouterLink>
+      <RouterLink
+        to="/about"
+        style="font-size:14px;text-decoration:none;font-family:'Inter',sans-serif;transition:color 0.15s;"
+        :style="{
+          color: route.path === '/about' ? '#00236f' : '#444651',
+          fontWeight: route.path === '/about' ? '600' : '400',
+        }"
+      >结果</RouterLink>
     </nav>
 
-    <!-- Right: User area -->
-    <div class="flex items-center gap-3">
-      <template v-if="currentSession">
-        <div class="user-menu relative">
-          <button
-            type="button"
-            class="flex items-center gap-2 rounded-full border border-outline-variant/30 bg-surface-container-low px-3 py-1.5 text-sm font-semibold text-on-surface shadow-sm transition-all hover:bg-surface-container-high active:scale-95"
-            style="font-family: 'Inter', sans-serif;"
-            @click.stop="toggleUserMenu"
-          >
-            <span
-              class="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-on-primary"
-            >{{ userInitial }}</span>
-            <span class="hidden sm:block max-w-[120px] truncate">{{ currentSession.username }}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="text-outline transition-transform duration-200" style="width:18px;height:18px;" :class="{ 'rotate-180': userMenuOpen }"><path d="M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6z"></path></svg>
-          </button>
+    <!-- Right: auth area -->
+    <div style="display: flex; align-items: center; gap: 12px;">
 
-          <!-- Dropdown -->
-          <div
-            v-if="userMenuOpen"
-            class="absolute right-0 top-full mt-2 w-52 rounded-xl border border-outline-variant/20 bg-surface/95 shadow-[0_10px_30px_rgba(30,58,138,0.12)] backdrop-blur-xl z-50"
-          >
-            <div class="px-4 pt-3 pb-2">
-              <p class="font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-on-surface-variant">已登录账号</p>
-              <p class="mt-0.5 truncate text-sm font-semibold text-on-surface">{{ currentSession.username }}</p>
-            </div>
-            <div class="mx-3 border-t border-outline-variant/20"></div>
-            <div class="p-1.5">
-              <button
-                type="button"
-                class="flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors hover:bg-surface-container-low"
-                @click="goProfile"
-              >
-                <span class="text-sm font-semibold text-on-surface">个人中心</span>
-                <span class="text-xs text-on-surface-variant">查看资料与积分记录</span>
-              </button>
-              <button
-                type="button"
-                class="flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors hover:bg-error-container/40"
-                @click="handleLogout"
-              >
-                <span class="text-sm font-semibold text-error">退出登录</span>
-                <span class="text-xs text-on-surface-variant">结束当前会话</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </template>
-      <template v-else>
+      <!-- ===== Logged OUT ===== -->
+      <template v-if="!session">
         <button
           type="button"
-          class="hidden md:inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold transition-all border border-primary text-primary bg-transparent hover:bg-primary/5"
-          style="font-family: 'Inter', sans-serif;"
-          @click="handleLogin"
+          style="
+            display: inline-flex; align-items: center;
+            padding: 7px 18px;
+            border-radius: 8px;
+            border: 1px solid #00236f;
+            background: transparent;
+            color: #00236f;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            transition: background 0.15s;
+          "
+          @click="showLoginModal = true"
+          @mouseenter="($event.currentTarget as HTMLElement).style.background='rgba(0,35,111,0.05)'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
         >登录</button>
         <button
           type="button"
-          class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-primary text-on-primary hover:opacity-90 active:scale-95"
-          style="font-family: 'Inter', sans-serif;"
-          @click="handleRegister"
-        >立即注册</button>
+          style="
+            display: inline-flex; align-items: center;
+            padding: 7px 18px;
+            border-radius: 8px;
+            background: #00236f;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            border: none;
+            cursor: pointer;
+          "
+          @click="showRegisterModal = true"
+          @mouseenter="($event.currentTarget as HTMLElement).style.background='#001a52'"
+          @mouseleave="($event.currentTarget as HTMLElement).style.background='#00236f'"
+        >免费开始</button>
       </template>
+
+      <!-- ===== Logged IN  ===== -->
+      <!-- Image #3 style: 👋 username + hover dropdown -->
+      <template v-else>
+        <div
+          style="position: relative; display: flex; align-items: center;"
+          @mouseenter="showDropdown"
+          @mouseleave="scheduleHide"
+        >
+          <!-- Trigger row: 👋 username -->
+          <div
+            style="
+              display: flex; align-items: center; gap: 8px;
+              padding: 6px 16px;
+              border-radius: 999px;
+              border: 1px solid rgba(197,197,211,0.5);
+              background: transparent;
+              cursor: default;
+              user-select: none;
+            "
+          >
+            <span style="font-size:18px;line-height:1;">👋</span>
+            <span style="font-size:14px;font-weight:600;color:#00236f;font-family:'Inter',sans-serif;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              {{ session.username }}
+            </span>
+            <!-- small caret hint -->
+            <svg viewBox="0 0 24 24" fill="none" style="width:14px;height:14px;color:#444651;transition:transform 0.2s;"
+                 :style="{ transform: dropdownVisible ? 'rotate(180deg)' : 'rotate(0deg)' }">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+
+          <!-- Hover Dropdown -->
+          <div
+            v-if="dropdownVisible"
+            style="
+              position: absolute;
+              right: 0;
+              top: calc(100% + 6px);
+              width: 180px;
+              border-radius: 12px;
+              border: 1px solid rgba(197,197,211,0.25);
+              background: rgba(248,249,255,0.98);
+              box-shadow: 0 8px 24px rgba(30,58,138,0.12);
+              backdrop-filter: blur(16px);
+              -webkit-backdrop-filter: blur(16px);
+              overflow: hidden;
+              z-index: 200;
+            "
+            @mouseenter="showDropdown"
+            @mouseleave="scheduleHide"
+          >
+            <!-- Profile -->
+            <button
+              type="button"
+              style="
+                display: flex; align-items: center; gap: 10px;
+                width: 100%; box-sizing: border-box;
+                padding: 11px 16px;
+                border: none; background: transparent;
+                text-align: left; cursor: pointer;
+                font-family: 'Inter', sans-serif;
+                transition: background 0.12s;
+              "
+              @mouseenter="($event.currentTarget as HTMLElement).style.background='rgba(0,35,111,0.06)'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+              @click="goProfile"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;color:#00236f;flex-shrink:0;">
+                <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+              </svg>
+              <span style="font-size:14px;font-weight:600;color:#0b1c30;">个人中心</span>
+            </button>
+
+            <div style="margin: 0 12px; border-top: 1px solid rgba(197,197,211,0.2);"></div>
+
+            <!-- Logout -->
+            <button
+              type="button"
+              style="
+                display: flex; align-items: center; gap: 10px;
+                width: 100%; box-sizing: border-box;
+                padding: 11px 16px;
+                border: none; background: transparent;
+                text-align: left; cursor: pointer;
+                font-family: 'Inter', sans-serif;
+                transition: background 0.12s;
+              "
+              @mouseenter="($event.currentTarget as HTMLElement).style.background='rgba(216,30,6,0.06)'"
+              @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+              @click="handleLogout"
+            >
+              <svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;color:#d81e06;flex-shrink:0;">
+                <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span style="font-size:14px;font-weight:600;color:#d81e06;">退出登录</span>
+            </button>
+          </div>
+        </div>
+      </template>
+
     </div>
   </header>
+
+  <!-- Login Modal -->
+  <LoginModal
+    v-if="showLoginModal"
+    @close="showLoginModal = false"
+    @success="onLoginSuccess"
+    @switch-to-register="showLoginModal = false; showRegisterModal = true"
+  />
+
+  <!-- Register Modal -->
+  <RegisterModal
+    v-if="showRegisterModal"
+    @close="showRegisterModal = false"
+    @success="onRegisterSuccess"
+    @switch-to-login="showRegisterModal = false; showLoginModal = true"
+  />
 </template>

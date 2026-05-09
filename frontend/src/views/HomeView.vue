@@ -1,31 +1,5 @@
 <template>
   <div class="min-h-screen" style="background-color: #f8f9ff; color: #0b1c30;">
-    <!-- Fixed TopAppBar -->
-    <header class="fixed top-0 z-50 w-full h-16 flex justify-between items-center px-6"
-            style="background: rgba(248,249,255,0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid rgba(197,197,211,0.2); box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
-      <div class="flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:24px;height:24px;color:#00236f;transform:scaleX(-1);"><path d="m15.82 7.22-1 .4c-.21-.16-.43-.29-.67-.39L14 6.17c-.02-.1-.1-.17-.2-.17h-1.6c-.1 0-.18.07-.19.17l-.15 1.06c-.24.1-.47.23-.67.39l-1-.4c-.09-.03-.2 0-.24.09l-.8 1.38a.2.2 0 0 0 .05.26l.85.66c-.03.12-.05.26-.05.39s.01.26.03.39l-.84.66a.19.19 0 0 0-.05.25l.8 1.39c.05.09.15.12.25.09l.99-.4c.21.16.43.29.68.39l.14 1.06c.02.1.1.17.2.17h1.6c.1 0 .18-.07.2-.17l.15-1.06c.24-.1.47-.23.67-.39l.99.4c.09.04.2 0 .24-.09l.8-1.39c.05-.09.03-.19-.05-.25l-.83-.66a2.561 2.561 0 0 0 0-.78l.85-.66a.2.2 0 0 0 .05-.26l-.8-1.38c-.05-.09-.16-.12-.25-.09zM13 11.43a1.43 1.43 0 1 1 0-2.86 1.43 1.43 0 0 1 0 2.86z"/><path d="M19.94 9.06c-.43-3.27-3.23-5.86-6.53-6.05C13.27 3 13.14 3 13 3 9.47 3 6.57 5.61 6.08 9l-1.93 3.48c-.41.66.07 1.52.85 1.52h1v2c0 1.1.9 2 2 2h1v3h7v-4.68a7.016 7.016 0 0 0 3.94-7.26zm-5.05 5.57-.89.42V19h-3v-3H8v-4H6.7l1.33-2.33C8.21 7.06 10.35 5 13 5c2.76 0 5 2.24 5 5 0 2.09-1.29 3.88-3.11 4.63z"/></svg>
-        <RouterLink to="/" class="font-bold text-xl" style="color: #00236f; text-decoration: none; font-family: 'Inter', sans-serif;">InterviewAI</RouterLink>
-      </div>
-      <nav class="hidden md:flex items-center gap-6">
-        <RouterLink to="/" class="text-sm" style="color: #444651; font-family: 'Inter', sans-serif; text-decoration: none;">首页</RouterLink>
-        <RouterLink to="/interview/setup" class="text-sm" style="color: #444651; font-family: 'Inter', sans-serif; text-decoration: none;">面试</RouterLink>
-        <RouterLink to="/about" class="text-sm" style="color: #444651; font-family: 'Inter', sans-serif; text-decoration: none;">结果</RouterLink>
-      </nav>
-      <div class="flex items-center gap-3">
-        <RouterLink to="/interview/setup"
-          class="hidden md:inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold transition-all"
-          style="color: #00236f; border: 1px solid #00236f; background: transparent; text-decoration: none; font-family: 'Inter', sans-serif;">
-          登录
-        </RouterLink>
-        <RouterLink to="/interview/setup"
-          class="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold transition-all"
-          style="background-color: #00236f; color: #ffffff; text-decoration: none; font-family: 'Inter', sans-serif;">
-          免费开始
-        </RouterLink>
-      </div>
-    </header>
-
     <main class="pt-16">
       <!-- Hero Section -->
       <section class="max-w-7xl mx-auto px-6 py-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -82,12 +56,12 @@
           <div class="rounded-2xl p-6" style="background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(30,58,138,0.08);">
             <!-- Mock video -->
             <div class="w-full aspect-video rounded-xl mb-4 relative overflow-hidden flex items-center justify-center"
-                 style="background: linear-gradient(135deg, #1e3a8a 0%, #00236f 100%);">
-              <span class="material-symbols-outlined text-white opacity-80" style="font-size: 64px;">video_chat</span>
+                 style="background: url('/src/assets/InterviewDemo.png') center/cover no-repeat;">
+
               <!-- Timer pill -->
               <div class="absolute top-3 right-3 px-3 py-1 rounded-full flex items-center gap-1"
                    style="background: rgba(255,255,255,0.15); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2);">
-                <span class="material-symbols-outlined text-white" style="font-size: 16px;">schedule</span>
+                <svg t="1778295613857" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="22958" width="16" height="16"><path d="M938.666667 512c0 235.648-191.018667 426.666667-426.666667 426.666667S85.333333 747.648 85.333333 512 276.352 85.333333 512 85.333333s426.666667 191.018667 426.666667 426.666667z" fill="#d81e06" p-id="22959"></path></svg>
                 <span class="text-white font-semibold text-sm" style="font-family: 'JetBrains Mono', monospace;">04:32</span>
               </div>
             </div>
@@ -308,6 +282,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import LogoLoop from '../components/LogoLoop.vue'
 
