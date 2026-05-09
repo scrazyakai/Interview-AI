@@ -6,6 +6,7 @@ import { API_BASE_URL, getApiErrorMessage, saveAuthSession } from '../utils/auth
 const emit = defineEmits<{
   close: []
   success: []
+  'switch-to-login': []
 }>()
 
 const router = useRouter()
