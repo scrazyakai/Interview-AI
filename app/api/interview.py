@@ -70,7 +70,10 @@ async def create_session(
 
 
 @router.post("/upload", response_model=ApiResponse[dict[str, str]])
-async def upload_resume(file: UploadFile = File(...)) -> ApiResponse[dict[str, str]]:
+async def upload_resume(
+    file: UploadFile = File(...),
+    _: UUID = Depends(get_current_user_id),
+) -> ApiResponse[dict[str, str]]:
     data = await file.read()
     if not data:
         raise BizException(
