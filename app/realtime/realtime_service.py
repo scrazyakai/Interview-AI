@@ -13,8 +13,8 @@ from sqlalchemy import select
 from app.db.session import AsyncSessionLocal
 from app.config.interview_config import build_realtime_ws_config, build_start_session_payload
 from app.core.log import get_logger
-from app.models import InterviewSession
-from app.models.session_history import MessageSourceEnum, SessionHistory
+from app.models import InterviewMessage, InterviewSession
+from app.models.interview_message import ROLE_CANDIDATE, ROLE_INTERVIEWER
 
 PROTOCOL_VERSION = 0b0001
 CLIENT_FULL_REQUEST = 0b0001
@@ -362,48 +362,76 @@ def _merge_transcript_fragments(fragments: list[str]) -> str:
     return merged.strip()
 
 
-async def _persist_session_message(
-    session_uuid: UUID,
-    user_id: UUID,
-    message: str,
-    source: MessageSourceEnum,
-) -> None:
-    content = message.strip()
-    if not content:
-        return
+class _MessageTracker:
+    """每场面试的消息序号和轮次状态，非线程安全，仅在单个 websocket 协程中使用。"""
 
-    async with AsyncSessionLocal() as session:
+    def __init__(self, session_db_id: int) -> None:
+        self.session_db_id = session_db_id
+        self._sequence = 0
+        self.round_no = 1
+        # 当前轮次面试官消息的 db id，candidate 回答时作为 parent_message_id
+        self.last_interviewer_id: int | None = None
+
+    def next_seq(self) -> int:
+        self._sequence += 1
+        return self._sequence
+
+    def on_candidate_turn_done(self) -> None:
+        """candidate 回答落库后调用，准备进入下一轮。"""
+        self.round_no += 1
+        self.last_interviewer_id = None
+
+
+async def _persist_interview_message(
+    tracker: _MessageTracker,
+    role: str,
+    content: str,
+    *,
+    parent_message_id: int | None = None,
+) -> int | None:
+    """写入 interview_messages，返回插入行的 id；失败返回 None，不中断对话。"""
+    content = content.strip()
+    if not content:
+        return None
+
+    async with AsyncSessionLocal() as db:
         try:
-            session.add(
-                SessionHistory(
-                    session_id=session_uuid,
-                    user_id=user_id,
-                    message=content,
-                    message_source=source.value,
-                )
+            msg = InterviewMessage(
+                session_id=tracker.session_db_id,
+                role=role,
+                content=content,
+                round_no=tracker.round_no,
+                sequence_no=tracker.next_seq(),
+                parent_message_id=parent_message_id,
             )
-            await session.commit()
+            db.add(msg)
+            await db.flush()
+            msg_id = msg.id
+            await db.commit()
             log.info(
-                "session_history persisted source=%s session_uuid=%s message_len=%s",
-                source.value,
-                session_uuid,
+                "interview_message persisted role=%s session_db_id=%s round=%s seq=%s len=%s",
+                role,
+                tracker.session_db_id,
+                tracker.round_no,
+                msg.sequence_no,
                 len(content),
             )
+            return msg_id
         except Exception:
             with suppress(Exception):
-                await session.rollback()
+                await db.rollback()
             log.exception(
-                "failed to persist session_history source=%s session_uuid=%s",
-                source.value,
-                session_uuid,
+                "failed to persist interview_message role=%s session_db_id=%s",
+                role,
+                tracker.session_db_id,
             )
+            return None
 
 
 async def _forward_upstream_messages(
     upstream_ws: websockets.ClientConnection,
     client_ws: WebSocket,
-    user_id: UUID,
-    session_uuid: UUID,
+    tracker: _MessageTracker,
 ) -> None:
     saw_user_transcript = False
     assistant_text_buffer: list[str] = []
@@ -473,7 +501,13 @@ async def _forward_upstream_messages(
                 saw_user_transcript = True
                 user_text_buffer = [text]
                 await client_ws.send_json({"type": "user_text", "text": text})
-                await _persist_session_message(session_uuid, user_id, text, MessageSourceEnum.USER)
+                await _persist_interview_message(
+                    tracker,
+                    ROLE_CANDIDATE,
+                    text,
+                    parent_message_id=tracker.last_interviewer_id,
+                )
+                tracker.on_candidate_turn_done()
                 user_turn_persisted = True
             continue
 
@@ -481,7 +515,8 @@ async def _forward_upstream_messages(
             if assistant_text_buffer:
                 assistant_text = "".join(assistant_text_buffer).strip()
                 if assistant_text:
-                    await _persist_session_message(session_uuid, user_id, assistant_text, MessageSourceEnum.AI)
+                    msg_id = await _persist_interview_message(tracker, ROLE_INTERVIEWER, assistant_text)
+                    tracker.last_interviewer_id = msg_id
                 assistant_text_buffer.clear()
             await client_ws.send_json({"type": "assistant_done"})
             continue
@@ -494,10 +529,16 @@ async def _forward_upstream_messages(
             if not user_turn_persisted:
                 fallback_user_text = _merge_transcript_fragments(user_text_buffer)
                 if fallback_user_text:
-                    await _persist_session_message(session_uuid, user_id, fallback_user_text, MessageSourceEnum.USER)
+                    await _persist_interview_message(
+                        tracker,
+                        ROLE_CANDIDATE,
+                        fallback_user_text,
+                        parent_message_id=tracker.last_interviewer_id,
+                    )
+                    tracker.on_candidate_turn_done()
                     log.info(
-                        "persisted user transcript on user_done fallback session_uuid=%s len=%s",
-                        session_uuid,
+                        "persisted candidate transcript on user_done fallback session_db_id=%s len=%s",
+                        tracker.session_db_id,
                         len(fallback_user_text),
                     )
             if not saw_user_transcript:
@@ -554,6 +595,8 @@ async def _get_interview_session(user_id: UUID, session_uuid: UUID) -> Interview
 class RealtimeService:
     async def bridge_websocket(self, client_ws: WebSocket, user_id: UUID, session_uuid: UUID) -> None:
         interview = await _get_interview_session(user_id, session_uuid)
+        tracker = _MessageTracker(session_db_id=interview.id)
+
         session_id = str(uuid.uuid4())
         ws_config = build_realtime_ws_config()
         start_session_payload = await build_start_session_payload(interview, input_mod="audio")
@@ -586,7 +629,7 @@ class RealtimeService:
             client_task = None
             try:
                 upstream_task = asyncio.create_task(
-                    _forward_upstream_messages(upstream_ws, client_ws, user_id, session_uuid)
+                    _forward_upstream_messages(upstream_ws, client_ws, tracker)
                 )
                 client_task = asyncio.create_task(self._forward_client_messages(client_ws, upstream_ws, session_id))
                 done, pending = await asyncio.wait(
