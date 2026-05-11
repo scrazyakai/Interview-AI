@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     VOLC_REALTIME_INPUT_FORMAT:str
     VOLC_REALTIME_INPUT_SAMPLE_RATE:str
     """Embedding 模型配置"""
+    EMBEDDING_PROVIDER: Optional[str] = None
     EMBEDDING_MODEL_NAME: str
     EMBEDDING_BASE_URL: Optional[str] = None
     EMBEDDING_API_KEY: Optional[str] = None

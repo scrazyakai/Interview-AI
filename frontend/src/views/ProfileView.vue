@@ -290,24 +290,51 @@ async function goToPage(page: number) {
 <template>
   <div class="min-h-screen pb-32" style="background-color: #f8f9ff; color: #0b1c30;">
     <!-- Loading State -->
-    <div v-if="profileLoading" class="flex items-center justify-center min-h-screen">
-      <div class="text-center">
-        <span class="material-symbols-outlined mb-4 block" style="font-size: 48px; color: #00236f;">hourglass_empty</span>
-        <p style="font-family: 'Inter', sans-serif; color: #444651;">正在加载个人中心数据...</p>
+    <div v-if="profileLoading" style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: #f8f9ff;">
+      <div style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0;">
+
+        <!-- 品牌图标 呼吸动画 -->
+        <div class="logo-breathe" style="width: 64px; height: 64px; background: #00236f; border-radius: 18px; display: flex; align-items: center; justify-content: center; margin-bottom: 28px; box-shadow: 0 8px 32px rgba(0,35,111,0.22);">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" style="width:32px;height:32px;transform:matrix(-1,0,0,1,0,0);">
+            <path d="M13 8.57a1.43 1.43 0 1 0 0 2.86 1.43 1.43 0 0 0 0-2.86z"/>
+            <path d="M13 3C9.25 3 6.2 5.94 6.02 9.64L4.1 12.2a.5.5 0 0 0 .4.8H6v3c0 1.1.9 2 2 2h1v3h7v-4.68A6.999 6.999 0 0 0 13 3zm3 7c0 .13-.01.26-.02.39l.83.66c.08.06.1.16.05.25l-.8 1.39c-.05.09-.16.12-.24.09l-.99-.4c-.21.16-.43.29-.67.39L14 13.83c-.01.1-.1.17-.2.17h-1.6c-.1 0-.18-.07-.2-.17l-.15-1.06c-.25-.1-.47-.23-.68-.39l-.99.4c-.09.03-.2 0-.25-.09l-.8-1.39a.19.19 0 0 1 .05-.25l.84-.66c-.01-.13-.02-.26-.02-.39s.02-.27.04-.39l-.85-.66c-.08-.06-.1-.16-.05-.26l.8-1.38c.05-.09.15-.12.24-.09l1 .4c.2-.15.43-.29.67-.39L12 6.17c.02-.1.1-.17.2-.17h1.6c.1 0 .18.07.2.17l.15 1.06c.24.1.46.23.67.39l1-.4c.09-.03.2 0 .24.09l.8 1.38a.2.2 0 0 1-.05.26l-.85.66c.03.12.04.25.04.39z"/>
+          </svg>
+        </div>
+
+        <!-- 三点波浪 -->
+        <div style="display: flex; gap: 7px; justify-content: center; margin-bottom: 20px;">
+          <span class="dot dot-1"></span>
+          <span class="dot dot-2"></span>
+          <span class="dot dot-3"></span>
+        </div>
+
+        <p style="font-family: 'Inter', sans-serif; color: #8c93a8; font-size: 13px; letter-spacing: 0.03em;">正在加载个人中心</p>
       </div>
     </div>
 
     <!-- Error State -->
-    <div v-else-if="profileError" class="flex items-center justify-center min-h-screen px-6">
-      <div class="rounded-xl p-8 text-center max-w-md w-full"
-           style="background: rgba(255,255,255,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.3); border-left: 4px solid #ba1a1a; box-shadow: 0 10px 30px rgba(30,58,138,0.05);">
-        <span class="material-symbols-outlined mb-4 block" style="font-size: 40px; color: #ba1a1a; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">error</span>
-        <p class="font-semibold mb-6" style="font-family: 'Inter', sans-serif; color: #0b1c30;">{{ profileError }}</p>
-        <button @click="loadProfilePage"
-                class="px-6 py-3 rounded-lg font-semibold transition-all active:scale-95"
-                style="background-color: #00236f; color: #ffffff; font-family: 'Inter', sans-serif;">
-          重新加载
-        </button>
+    <div v-else-if="profileError" style="display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 0 24px;">
+      <div style="background: #ffffff; border-radius: 16px; padding: 40px 36px; text-align: center; width: 400px; max-width: calc(100vw - 48px); box-shadow: 0 4px 24px rgba(30,58,138,0.08); border-top: 4px solid #ba1a1a;">
+        <div style="width: 56px; height: 56px; background: #fff1f1; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+          <svg t="1778503795609" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+            <path d="M753.845117 371.674021l-17.46272 0 0-83.669608c0-59.275012-22.62837-115.203812-63.715137-157.482731-42.170448-43.394323-99.369172-67.291592-161.058163-67.291592-126.040624 0-224.772276 98.731652-224.772276 224.7733l0 83.669608-16.680914 0c-62.788022 0-113.688295 50.900274-113.688295 113.688295L156.467611 842.961784c0 62.788022 50.900274 113.688295 113.688295 113.688295l483.690234 0c62.788022 0 113.688295-50.900274 113.688295-113.688295L867.534436 485.362316C867.532389 422.574295 816.633139 371.674021 753.845117 371.674021zM328.176344 288.005436c0-102.858646 80.573083-183.432753 183.431729-183.432753 50.423413 0 97.093339 19.447934 131.410935 54.762231 33.547047 34.519188 52.021817 80.214926 52.021817 128.670521l0 83.669608L328.176344 371.675044 328.176344 288.005436zM826.191842 842.961784c0 39.956014-32.390711 72.346725-72.346725 72.346725L270.154883 915.308509c-39.956014 0-72.346725-32.390711-72.346725-72.346725L197.808158 485.362316c0-39.956014 32.390711-72.346725 72.346725-72.346725l483.690234 0c39.956014 0 72.346725 32.390711 72.346725 72.346725L826.191842 842.961784z" fill="#ba1a1a"/>
+            <path d="M509.932921 580.446905c-11.416004 0-20.670785 9.254781-20.670785 20.670785l0 109.554138c0 11.414981 9.254781 20.670785 20.670785 20.670785 11.416004 0 20.670785-9.254781 20.670785-20.670785L530.603707 601.116667C530.602683 589.701686 521.348925 580.446905 509.932921 580.446905z" fill="#ba1a1a"/>
+          </svg>
+        </div>
+        <h3 style="font-size: 17px; font-weight: 600; color: #0b1c30; margin: 0 0 8px; font-family: 'Inter', sans-serif;">登录已失效</h3>
+        <p style="font-size: 14px; color: #6b7280; margin: 0 0 28px; line-height: 1.6; font-family: 'Inter', sans-serif;">{{ profileError }}</p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button @click="router.push('/login')"
+                  style="padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; background-color: #00236f; color: #ffffff; border: none; cursor: pointer; font-family: 'Inter', sans-serif; transition: opacity 0.15s;"
+                  onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+            重新登录
+          </button>
+          <button @click="loadProfilePage"
+                  style="padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; background-color: #f3f4f6; color: #374151; border: none; cursor: pointer; font-family: 'Inter', sans-serif; transition: opacity 0.15s;"
+                  onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
+            重试
+          </button>
+        </div>
       </div>
     </div>
 
@@ -545,7 +572,7 @@ async function goToPage(page: number) {
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="mb-2 block mx-auto transition-colors" style="width:40px;height:40px;" :style="{ color: hasResume ? '#006c49' : 'rgba(0,35,111,0.3)' }">
               <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95A5.469 5.469 0 0 1 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11A2.98 2.98 0 0 1 22 15c0 1.65-1.35 3-3 3zM8 13h2.55v3h2.9v-3H16l-4-4z"></path>
             </svg>
-            <p class="font-semibold text-sm mb-1" style="font-family: 'Inter', sans-serif; color: #0b1c30;">{{ resumeFileName || 'Standard_Resume_2023.pdf' }}</p>
+            <p v-if="resumeFileName" class="font-semibold text-sm mb-1" style="font-family: 'Inter', sans-serif; color: #0b1c30;">{{ resumeFileName }}</p>
             <p class="text-xs" style="font-family: 'Inter', sans-serif; color: #444651;">{{ hasResume ? 'Resume on file' : 'No resume uploaded yet' }}</p>
           </div>
           <div class="flex flex-col gap-2">
@@ -622,3 +649,31 @@ async function goToPage(page: number) {
 
   </div>
 </template>
+
+<style scoped>
+/* 品牌图标呼吸动画 */
+.logo-breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(1);   box-shadow: 0 8px 32px rgba(0,35,111,0.22); }
+  50%       { transform: scale(1.08); box-shadow: 0 12px 40px rgba(0,35,111,0.34); }
+}
+
+/* 三点波浪 */
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00236f;
+  animation: wave 1.3s ease-in-out infinite;
+}
+.dot-1 { animation-delay: 0s;    opacity: 0.35; }
+.dot-2 { animation-delay: 0.18s; opacity: 0.35; }
+.dot-3 { animation-delay: 0.36s; opacity: 0.35; }
+@keyframes wave {
+  0%, 70%, 100% { transform: translateY(0);   opacity: 0.35; }
+  35%           { transform: translateY(-9px); opacity: 1;    }
+}
+</style>

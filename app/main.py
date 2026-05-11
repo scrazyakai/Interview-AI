@@ -1,7 +1,10 @@
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.params import Depends
+from app.api import resume
 from starlette.middleware.cors import CORSMiddleware
 
+from app.common.dependencies import get_current_user_id
 from app.core.log import AccessLogMiddleware, configure_logging
 
 load_dotenv()
@@ -16,8 +19,10 @@ app = FastAPI()
 register_exception_handlers(app)
 
 app.include_router(auth.router)
-app.include_router(user.router)
-app.include_router(interview.router)
+
+app.include_router(resume.router,dependencies=[Depends(get_current_user_id)])
+app.include_router(user.router,dependencies=[Depends(get_current_user_id)])
+app.include_router(interview.router,dependencies=[Depends(get_current_user_id)])
 
 app.add_middleware(
     CORSMiddleware,

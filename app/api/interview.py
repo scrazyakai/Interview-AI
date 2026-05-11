@@ -3,7 +3,9 @@ import traceback
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, File, Query, UploadFile, WebSocket, WebSocketDisconnect
-from pymupdf import pymupdf
+import io
+
+import pdfplumber
 
 from app.common.dependencies import get_current_user_id, parse_user_id_from_token
 from app.core.exception import ApiResponse, BizException, ErrorCode
@@ -71,8 +73,7 @@ async def create_session(
 
 @router.post("/upload", response_model=ApiResponse[dict[str, str]])
 async def upload_resume(
-    file: UploadFile = File(...),
-    _: UUID = Depends(get_current_user_id),
+    file: UploadFile = File(...)
 ) -> ApiResponse[dict[str, str]]:
     data = await file.read()
     if not data:
@@ -82,13 +83,9 @@ async def upload_resume(
             description="The resume upload endpoint received an empty file payload.",
         )
 
-    doc = pymupdf.open(stream=data, filetype="pdf")
-    texts = []
-    for page in doc:
-        page_text = page.get_text().strip()
-        if page_text:
-            texts.append(page_text)
-    return ApiResponse.success(data={"resume_text": "\n".join(texts)})
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        texts = [page.extract_text() or "" for page in pdf.pages]
+    return ApiResponse.success(data={"resume_text": "\n".join(t.strip() for t in texts if t.strip())})
 
 
 @router.get("/session/{session_id}", response_model=ApiResponse[SessionHistoryListResponse])
