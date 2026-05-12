@@ -62,6 +62,436 @@ const pointRecords = ref<PointRecord[]>([])
 const totalRecordCount = ref(0)
 const currentPage = ref(1)
 
+const resumeUploading = ref(false)
+const resumeUploadError = ref('')
+const resumeFileInput = ref<HTMLInputElement | null>(null)
+
+// ── 通知系统 ─────────────────────────────────────────────────
+type Toast = { id: number; type: 'info' | 'success' | 'error'; message: string }
+const toasts = ref<Toast[]>([])
+let toastSeq = 0
+function addToast(type: Toast['type'], message: string, duration = 5000) {
+  const id = ++toastSeq
+  toasts.value.push({ id, type, message })
+  setTimeout(() => { toasts.value = toasts.value.filter(t => t.id !== id) }, duration)
+}
+function removeToast(id: number) {
+  toasts.value = toasts.value.filter(t => t.id !== id)
+}
+
+// ── 简历解析轮询 ─────────────────────────────────────────────
+let pollTimer: ReturnType<typeof setInterval> | null = null
+function startPolling(resumeId: number) {
+  if (pollTimer) clearInterval(pollTimer)
+  pollTimer = setInterval(async () => {
+    try {
+      const list = await requestWithAuth<ResumeListItem[]>('/resume/list')
+      const target = list.find(r => r.id === resumeId)
+      if (!target) return
+      if (target.parse_status === 'success') {
+        clearInterval(pollTimer!)
+        pollTimer = null
+        resumeList.value = list
+        resumeUploading.value = false
+        addToast('success', `「${target.file_name}」解析完成 ✓`)
+      } else if (target.parse_status === 'failed') {
+        clearInterval(pollTimer!)
+        pollTimer = null
+        resumeList.value = list
+        resumeUploading.value = false
+        addToast('error', `「${target.file_name}」解析失败，请重新上传`)
+      }
+    } catch { /* 静默失败，继续轮询 */ }
+  }, 3000)
+}
+
+type ResumeListItem = {
+  id: number
+  resume_uuid: string
+  file_name: string
+  parse_status: string
+  name?: string | null
+  created_at: string
+}
+
+type ResumeParseResult = {
+  name?: string | null
+  email?: string | null
+  phone?: string | null
+  location?: string | null
+  summary?: string | null
+  skills?: string[]
+  total_years_exp?: number | null
+  work_experiences?: { id?: number; company: string; title?: string | null; start_date?: string | null; end_date?: string | null; description?: string | null; tech_stack?: string[] }[]
+  projects?: { id?: number; name: string; role?: string | null; start_date?: string | null; end_date?: string | null; description?: string | null; tech_stack?: string[] }[]
+  educations?: { id?: number; school: string; degree?: string | null; major?: string | null; graduation_year?: string | null }[]
+}
+
+// modal 状态
+const resumeModalOpen = ref(false)
+const resumeModalLoading = ref(false)
+const resumeModalError = ref('')
+// 列表视图
+const resumeList = ref<ResumeListItem[]>([])
+// 详情视图
+const resumeDetail = ref<ResumeParseResult | null>(null)
+const resumeDetailId = ref<number | null>(null)
+// 删除中
+const deletingId = ref<number | null>(null)
+const isEditing = ref(false)
+const isSaving = ref(false)
+type EditForm = { name: string; email: string; phone: string; location: string; summary: string; total_years_exp: string }
+const editForm = ref<EditForm>({ name: '', email: '', phone: '', location: '', summary: '', total_years_exp: '' })
+const editSkills = ref<string[]>([])
+const newSkillInput = ref('')
+
+// 通用确认弹窗
+const confirmDialog = ref<{ open: boolean; title: string; message: string; resolve: ((v: boolean) => void) | null }>({
+  open: false, title: '', message: '', resolve: null,
+})
+function showConfirm(title: string, message: string): Promise<boolean> {
+  return new Promise(resolve => {
+    confirmDialog.value = { open: true, title, message, resolve }
+  })
+}
+function onConfirmOk() {
+  confirmDialog.value.resolve?.(true)
+  confirmDialog.value.open = false
+}
+function onConfirmCancel() {
+  confirmDialog.value.resolve?.(false)
+  confirmDialog.value.open = false
+}
+
+// 工作经历内联编辑
+type WorkExpForm = { company: string; title: string; start_date: string; end_date: string; description: string; tech_stack: string }
+const editingWorkExpId = ref<number | 'new' | null>(null)
+const workExpForm = ref<WorkExpForm>({ company: '', title: '', start_date: '', end_date: '', description: '', tech_stack: '' })
+const savingWorkExp = ref(false)
+
+// 教育经历内联编辑
+type EduForm = { school: string; degree: string; major: string; graduation_year: string }
+const editingEduId = ref<number | 'new' | null>(null)
+const eduForm = ref<EduForm>({ school: '', degree: '', major: '', graduation_year: '' })
+const savingEdu = ref(false)
+
+// 项目经历内联编辑
+type ProjectForm = { name: string; role: string; start_date: string; end_date: string; description: string; tech_stack: string }
+const editingProjectId = ref<number | 'new' | null>(null)
+const projectForm = ref<ProjectForm>({ name: '', role: '', start_date: '', end_date: '', description: '', tech_stack: '' })
+const savingProject = ref(false)
+
+function closeResumeModal() {
+  resumeModalOpen.value = false
+  resumeDetail.value = null
+  resumeDetailId.value = null
+}
+
+async function openResumeModal() {
+  resumeModalOpen.value = true
+  resumeDetail.value = null
+  resumeDetailId.value = null
+  resumeModalLoading.value = true
+  resumeModalError.value = ''
+  try {
+    resumeList.value = await requestWithAuth<ResumeListItem[]>('/resume/list')
+  } catch (error) {
+    resumeModalError.value = error instanceof Error ? error.message : '获取简历列表失败'
+  } finally {
+    resumeModalLoading.value = false
+  }
+}
+
+async function openResumeDetail(id: number) {
+  resumeDetailId.value = id
+  resumeModalLoading.value = true
+  resumeModalError.value = ''
+  try {
+    resumeDetail.value = await requestWithAuth<ResumeParseResult>(`/resume/result/${id}`)
+  } catch (error) {
+    resumeModalError.value = error instanceof Error ? error.message : '获取解析详情失败'
+  } finally {
+    resumeModalLoading.value = false
+  }
+}
+
+function backToList() {
+  resumeDetail.value = null
+  resumeDetailId.value = null
+  resumeModalError.value = ''
+  isEditing.value = false
+}
+
+function startEditing() {
+  const d = resumeDetail.value!
+  editForm.value = {
+    name: d.name ?? '',
+    email: d.email ?? '',
+    phone: d.phone ?? '',
+    location: d.location ?? '',
+    summary: d.summary ?? '',
+    total_years_exp: d.total_years_exp != null ? String(d.total_years_exp) : '',
+  }
+  editSkills.value = [...(d.skills ?? [])]
+  newSkillInput.value = ''
+  isEditing.value = true
+}
+
+function addSkill() {
+  const s = newSkillInput.value.trim()
+  if (s && !editSkills.value.includes(s)) {
+    editSkills.value.push(s)
+  }
+  newSkillInput.value = ''
+}
+
+function removeSkill(index: number) {
+  editSkills.value.splice(index, 1)
+}
+
+async function saveEdit() {
+  if (!resumeDetailId.value) return
+  isSaving.value = true
+  resumeModalError.value = ''
+  try {
+    const payload: Record<string, unknown> = {
+      skills: editSkills.value,
+    }
+    if (editForm.value.name) payload.name = editForm.value.name
+    if (editForm.value.email) payload.email = editForm.value.email
+    if (editForm.value.phone) payload.phone = editForm.value.phone
+    if (editForm.value.location) payload.location = editForm.value.location
+    if (editForm.value.summary) payload.summary = editForm.value.summary
+    if (editForm.value.total_years_exp !== '') payload.total_years_exp = Number(editForm.value.total_years_exp)
+    await postWithAuth(`/resume/${resumeDetailId.value}/update`, payload)
+    // 更新本地详情数据
+    Object.assign(resumeDetail.value!, {
+      name: editForm.value.name || null,
+      email: editForm.value.email || null,
+      phone: editForm.value.phone || null,
+      location: editForm.value.location || null,
+      summary: editForm.value.summary || null,
+      total_years_exp: editForm.value.total_years_exp !== '' ? Number(editForm.value.total_years_exp) : null,
+      skills: [...editSkills.value],
+    })
+    // 同步列表里的姓名
+    const listItem = resumeList.value.find(r => r.id === resumeDetailId.value)
+    if (listItem) listItem.name = editForm.value.name || null
+    isEditing.value = false
+  } catch (error) {
+    resumeModalError.value = error instanceof Error ? error.message : '保存失败'
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function deleteResume(id: number) {
+  if (!await showConfirm('删除简历', '确认删除这份简历？此操作不可恢复。')) return
+  deletingId.value = id
+  try {
+    await postWithAuth(`/resume/${id}/delete`)
+    resumeList.value = resumeList.value.filter(r => r.id !== id)
+    if (resumeDetailId.value === id) backToList()
+  } catch (error) {
+    resumeModalError.value = error instanceof Error ? error.message : '删除失败'
+  } finally {
+    deletingId.value = null
+  }
+}
+
+// ── 工作经历操作 ────────────────────────────────────────────
+function startEditWorkExp(w: { id?: number; company: string; title?: string | null; start_date?: string | null; end_date?: string | null; description?: string | null; tech_stack?: string[] }) {
+  if (w.id == null) {
+    resumeModalError.value = '工作经历 ID 缺失，请关闭后重新打开详情页再编辑'
+    return
+  }
+  editingWorkExpId.value = w.id
+  workExpForm.value = {
+    company: w.company,
+    title: w.title ?? '',
+    start_date: w.start_date ?? '',
+    end_date: w.end_date ?? '',
+    description: w.description ?? '',
+    tech_stack: (w.tech_stack ?? []).join(', '),
+  }
+}
+
+function startAddWorkExp() {
+  editingWorkExpId.value = 'new'
+  workExpForm.value = { company: '', title: '', start_date: '', end_date: '', description: '', tech_stack: '' }
+}
+
+async function saveWorkExp() {
+  if (!resumeDetailId.value) return
+  savingWorkExp.value = true
+  const payload = {
+    company: workExpForm.value.company,
+    title: workExpForm.value.title || null,
+    start_date: workExpForm.value.start_date || null,
+    end_date: workExpForm.value.end_date || null,
+    description: workExpForm.value.description || null,
+    tech_stack: workExpForm.value.tech_stack ? workExpForm.value.tech_stack.split(',').map(s => s.trim()).filter(Boolean) : [],
+  }
+  try {
+    const rid = resumeDetailId.value
+    if (editingWorkExpId.value === 'new') {
+      const created = await postWithAuth<{ id: number; company: string; title?: string | null; start_date?: string | null; end_date?: string | null; description?: string | null; tech_stack?: string[]; resume_id: number; sort_order: number }>(`/resume/${rid}/work-experience/add`, payload)
+      resumeDetail.value!.work_experiences = [...(resumeDetail.value!.work_experiences ?? []), created]
+    } else {
+      await postWithAuth(`/resume/${rid}/work-experience/${editingWorkExpId.value}/update`, payload)
+      const list = resumeDetail.value!.work_experiences ?? []
+      const idx = list.findIndex(w => w.id === editingWorkExpId.value)
+      if (idx !== -1) list[idx] = { ...list[idx], ...payload }
+    }
+    editingWorkExpId.value = null
+  } catch (e) {
+    resumeModalError.value = e instanceof Error ? e.message : '保存失败'
+  } finally {
+    savingWorkExp.value = false
+  }
+}
+
+async function deleteWorkExp(expId: number) {
+  if (!resumeDetailId.value || !await showConfirm('删除工作经历', '确认删除该条工作经历？')) return
+  try {
+    await postWithAuth(`/resume/${resumeDetailId.value}/work-experience/${expId}/delete`)
+    resumeDetail.value!.work_experiences = (resumeDetail.value!.work_experiences ?? []).filter(w => w.id !== expId)
+  } catch (e) {
+    resumeModalError.value = e instanceof Error ? e.message : '删除失败'
+  }
+}
+
+// ── 教育经历操作 ────────────────────────────────────────────
+function startEditEdu(e: { id?: number; school: string; degree?: string | null; major?: string | null; graduation_year?: string | null }) {
+  if (e.id == null) {
+    resumeModalError.value = '教育经历 ID 缺失，请关闭后重新打开详情页再编辑'
+    return
+  }
+  editingEduId.value = e.id
+  eduForm.value = { school: e.school, degree: e.degree ?? '', major: e.major ?? '', graduation_year: e.graduation_year ?? '' }
+}
+
+function startAddEdu() {
+  editingEduId.value = 'new'
+  eduForm.value = { school: '', degree: '', major: '', graduation_year: '' }
+}
+
+async function saveEdu() {
+  if (!resumeDetailId.value) return
+  savingEdu.value = true
+  const payload = {
+    school: eduForm.value.school,
+    degree: eduForm.value.degree || null,
+    major: eduForm.value.major || null,
+    graduation_year: eduForm.value.graduation_year || null,
+  }
+  try {
+    const rid = resumeDetailId.value
+    if (editingEduId.value === 'new') {
+      const created = await postWithAuth<{ id: number; school: string; degree?: string | null; major?: string | null; graduation_year?: string | null }>(`/resume/${rid}/education/add`, payload)
+      resumeDetail.value!.educations = [...(resumeDetail.value!.educations ?? []), created]
+    } else {
+      await postWithAuth(`/resume/${rid}/education/${editingEduId.value}/update`, payload)
+      const list = resumeDetail.value!.educations ?? []
+      const idx = list.findIndex(e => e.id === editingEduId.value)
+      if (idx !== -1) list[idx] = { ...list[idx], ...payload }
+    }
+    editingEduId.value = null
+  } catch (e) {
+    resumeModalError.value = e instanceof Error ? e.message : '保存失败'
+  } finally {
+    savingEdu.value = false
+  }
+}
+
+async function deleteEdu(eduId: number) {
+  if (!resumeDetailId.value || !await showConfirm('删除教育经历', '确认删除该条教育经历？')) return
+  try {
+    await postWithAuth(`/resume/${resumeDetailId.value}/education/${eduId}/delete`)
+    resumeDetail.value!.educations = (resumeDetail.value!.educations ?? []).filter(e => e.id !== eduId)
+  } catch (e) {
+    resumeModalError.value = e instanceof Error ? e.message : '删除失败'
+  }
+}
+
+// ── 项目经历操作 ────────────────────────────────────────────
+function startEditProject(p: { id?: number; name: string; role?: string | null; start_date?: string | null; end_date?: string | null; description?: string | null; tech_stack?: string[] }) {
+  if (p.id == null) {
+    resumeModalError.value = '项目 ID 缺失，请关闭后重新打开详情页再编辑'
+    return
+  }
+  editingProjectId.value = p.id
+  projectForm.value = {
+    name: p.name,
+    role: p.role ?? '',
+    start_date: p.start_date ?? '',
+    end_date: p.end_date ?? '',
+    description: p.description ?? '',
+    tech_stack: (p.tech_stack ?? []).join(', '),
+  }
+}
+
+function startAddProject() {
+  editingProjectId.value = 'new'
+  projectForm.value = { name: '', role: '', start_date: '', end_date: '', description: '', tech_stack: '' }
+}
+
+async function saveProject() {
+  if (!resumeDetailId.value) return
+  savingProject.value = true
+  const payload = {
+    name: projectForm.value.name,
+    role: projectForm.value.role || null,
+    start_date: projectForm.value.start_date || null,
+    end_date: projectForm.value.end_date || null,
+    description: projectForm.value.description || null,
+    tech_stack: projectForm.value.tech_stack ? projectForm.value.tech_stack.split(',').map(s => s.trim()).filter(Boolean) : [],
+  }
+  try {
+    const rid = resumeDetailId.value
+    if (editingProjectId.value === 'new') {
+      const created = await postWithAuth<{ id: number; name: string; role?: string | null; start_date?: string | null; end_date?: string | null; description?: string | null; tech_stack?: string[]; resume_id: number; sort_order: number }>(`/resume/${rid}/project/add`, payload)
+      resumeDetail.value!.projects = [...(resumeDetail.value!.projects ?? []), created]
+    } else {
+      await postWithAuth(`/resume/${rid}/project/${editingProjectId.value}/update`, payload)
+      const list = resumeDetail.value!.projects ?? []
+      const idx = list.findIndex(p => p.id === editingProjectId.value)
+      if (idx !== -1) list[idx] = { ...list[idx], ...payload }
+    }
+    editingProjectId.value = null
+  } catch (e) {
+    resumeModalError.value = e instanceof Error ? e.message : '保存失败'
+  } finally {
+    savingProject.value = false
+  }
+}
+
+async function deleteProject(projectId: number) {
+  if (!resumeDetailId.value || !await showConfirm('删除项目经历', '确认删除该条项目经历？')) return
+  try {
+    await postWithAuth(`/resume/${resumeDetailId.value}/project/${projectId}/delete`)
+    resumeDetail.value!.projects = (resumeDetail.value!.projects ?? []).filter(p => p.id !== projectId)
+  } catch (e) {
+    resumeModalError.value = e instanceof Error ? e.message : '删除失败'
+  }
+}
+
+async function postWithAuth<T = void>(path: string, body?: unknown): Promise<T> {
+  const currentSession = loadAuthSession()
+  if (!currentSession) throw new Error('未检测到登录状态')
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `${currentSession.token_type} ${currentSession.access_token}`,
+      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+  const data = await response.json().catch(() => null)
+  if (!response.ok) throw new Error(getApiErrorMessage(data, '请求失败'))
+  return extractApiPayload<T>(data) as T
+}
+
 const profileName = computed(() => {
   const username = profileData.value?.username ?? session.value?.username ?? '用户'
   return String(username)
@@ -73,6 +503,9 @@ const totalPoints = computed(() => {
   const rawValue = profileData.value?.total_points
   return typeof rawValue === 'number' ? rawValue : 0
 })
+
+type UserStats = { total_interviews: number; total_points: number; total_point_records: number }
+const userStats = ref<UserStats>({ total_interviews: 0, total_points: 0, total_point_records: 0 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(totalRecordCount.value / PAGE_SIZE)))
 const pageStart = computed(() => (totalRecordCount.value === 0 ? 0 : (currentPage.value - 1) * PAGE_SIZE + 1))
@@ -241,6 +674,57 @@ function formatDateTime(value?: string) {
   }).format(date)
 }
 
+function triggerResumeUpload() {
+  resumeUploadError.value = ''
+  resumeFileInput.value?.click()
+}
+
+async function uploadResume(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  const currentSession = loadAuthSession()
+  if (!currentSession) return
+
+  resumeUploading.value = true
+  resumeUploadError.value = ''
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(`${API_BASE_URL}/resume/parse`, {
+      method: 'POST',
+      headers: {
+        Authorization: `${currentSession.token_type} ${currentSession.access_token}`,
+      },
+      body: formData,
+    })
+
+    const data = await response.json().catch(() => null)
+
+    if (!response.ok) {
+      throw new Error(getApiErrorMessage(data, '上传失败，请稍后重试。'))
+    }
+
+    // 立即刷新列表（pending 状态）
+    const resumeId = extractApiPayload<number>(data) as number
+    const list = await requestWithAuth<ResumeListItem[]>('/resume/list').catch(() => resumeList.value)
+    resumeList.value = list
+
+    addToast('info', `「${file.name}」上传成功，正在后台解析...`, 8000)
+    startPolling(resumeId)
+    // 上传后 resumeUploading 保持 true，直到轮询到结果才关闭
+    return
+  } catch (error) {
+    resumeUploadError.value = error instanceof Error ? error.message : '上传失败，请稍后重试。'
+    resumeUploading.value = false
+  } finally {
+    input.value = ''
+  }
+}
+
 function logout() {
   clearAuthSession()
   router.push('/')
@@ -270,7 +754,11 @@ async function loadProfilePage() {
     const [meResponse] = await Promise.all([requestWithAuth<ProfileData>('/user/me')])
 
     profileData.value = meResponse
-    await loadPointRecords()
+    await Promise.all([
+      loadPointRecords(),
+      requestWithAuth<ResumeListItem[]>('/resume/list').then(list => { resumeList.value = list }).catch(() => {}),
+      requestWithAuth<UserStats>('/user/stats').then(stats => { userStats.value = stats }).catch(() => {}),
+    ])
   } catch (error) {
     profileError.value =
       error instanceof Error ? error.message : '加载个人中心失败。'
@@ -426,7 +914,7 @@ async function goToPage(page: number) {
           </div>
           <div>
             <p class="text-xs font-semibold tracking-widest uppercase mb-1" style="font-family: 'JetBrains Mono', monospace; color: #444651;">总面试次数</p>
-            <p class="font-semibold" style="font-family: 'Inter', sans-serif; font-size: 36px; line-height: 1.2; letter-spacing: -0.01em; color: #0b1c30;">{{ totalRecordCount }}</p>
+            <p class="font-semibold" style="font-family: 'Inter', sans-serif; font-size: 36px; line-height: 1.2; letter-spacing: -0.01em; color: #0b1c30;">{{ userStats.total_interviews }}</p>
           </div>
         </div>
 
@@ -442,7 +930,7 @@ async function goToPage(page: number) {
           <div>
             <p class="text-xs font-semibold tracking-widest uppercase mb-1" style="font-family: 'JetBrains Mono', monospace; color: #444651;">当前积分</p>
             <p class="font-semibold" style="font-family: 'Inter', sans-serif; font-size: 36px; line-height: 1.2; letter-spacing: -0.01em; color: #0b1c30;">
-              {{ totalPoints }}<span class="font-normal" style="font-size: 24px; line-height: 1.3;"> 分</span>
+              {{ userStats.total_points }}<span class="font-normal" style="font-size: 24px; line-height: 1.3;"> 分</span>
             </p>
           </div>
         </div>
@@ -457,7 +945,7 @@ async function goToPage(page: number) {
           </div>
           <div>
             <p class="text-xs font-semibold tracking-widest uppercase mb-1" style="font-family: 'JetBrains Mono', monospace; color: #444651;">积分记录条数</p>
-            <p class="font-semibold" style="font-family: 'Inter', sans-serif; font-size: 36px; line-height: 1.2; letter-spacing: -0.01em; color: #0b1c30;">{{ displayRecords.length }}</p>
+            <p class="font-semibold" style="font-family: 'Inter', sans-serif; font-size: 36px; line-height: 1.2; letter-spacing: -0.01em; color: #0b1c30;">{{ userStats.total_point_records }}</p>
           </div>
         </div>
       </section>
@@ -581,25 +1069,76 @@ async function goToPage(page: number) {
             </svg>
             简历管理
           </h3>
-          <div class="rounded-lg p-6 text-center mb-6"
+          <input
+            ref="resumeFileInput"
+            type="file"
+            accept=".pdf"
+            style="display: none;"
+            @change="uploadResume"
+          />
+          <!-- 有简历：展示第一条 -->
+          <div v-if="resumeList.length && !resumeUploading"
+               class="rounded-lg p-4 mb-6 flex items-center gap-3 cursor-pointer transition-colors"
+               style="background-color: #ffffff; border: 2px solid #dce9ff;"
+               onmouseover="this.style.borderColor='#00236f'"
+               onmouseout="this.style.borderColor='#dce9ff'"
+               @click="openResumeModal">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#dce9ff;">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:20px;height:20px;color:#00236f;">
+                <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+              </svg>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold truncate" style="font-family:'Inter',sans-serif;color:#0b1c30;">{{ resumeList[0].file_name }}</p>
+              <p class="text-xs mt-0.5" style="font-family:'Inter',sans-serif;color:#757682;">
+                {{ resumeList[0].name ?? '未识别姓名' }} · {{ formatDateTime(resumeList[0].created_at) }}
+              </p>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0"
+                  style="background:#d1fae5;color:#065f46;font-family:'Inter',sans-serif;">已解析</span>
+          </div>
+          <!-- 无简历或上传中 -->
+          <div v-else
+               class="rounded-lg p-6 text-center mb-6"
                style="background-color: #ffffff; border: 2px dashed #c5c5d3;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="mb-2 block mx-auto transition-colors" style="width:40px;height:40px;" :style="{ color: hasResume ? '#006c49' : 'rgba(0,35,111,0.3)' }">
+            <!-- 上传动画 -->
+            <div v-if="resumeUploading" style="position:relative;width:60px;height:60px;margin:0 auto 8px;">
+              <!-- 绕圈小长条 -->
+              <svg viewBox="0 0 60 60" style="position:absolute;inset:0;width:60px;height:60px;" class="resume-orbit">
+                <circle cx="30" cy="30" r="28"
+                        fill="none"
+                        stroke="#6cf8bb"
+                        stroke-width="3"
+                        stroke-linecap="round"
+                        stroke-dasharray="44 132"/>
+              </svg>
+              <!-- 云图标 -->
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+                   style="position:absolute;inset:0;margin:auto;width:34px;height:34px;top:50%;left:50%;transform:translate(-50%,-50%);color:#00236f;">
+                <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95A5.469 5.469 0 0 1 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11A2.98 2.98 0 0 1 22 15c0 1.65-1.35 3-3 3zM8 13h2.55v3h2.9v-3H16l-4-4z"/>
+              </svg>
+            </div>
+            <!-- 无简历静态图标 -->
+            <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="mb-2 block mx-auto" style="width:40px;height:40px;color:rgba(0,35,111,0.3);">
               <path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95A5.469 5.469 0 0 1 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11A2.98 2.98 0 0 1 22 15c0 1.65-1.35 3-3 3zM8 13h2.55v3h2.9v-3H16l-4-4z"></path>
             </svg>
-            <p v-if="resumeFileName" class="font-semibold text-sm mb-1" style="font-family: 'Inter', sans-serif; color: #0b1c30;">{{ resumeFileName }}</p>
-            <p class="text-xs" style="font-family: 'Inter', sans-serif; color: #444651;">{{ hasResume ? 'Resume on file' : 'No resume uploaded yet' }}</p>
+            <p v-if="resumeUploading" class="text-xs font-semibold" style="font-family:'Inter',sans-serif;color:#00236f;">正在解析中...</p>
+            <p v-else class="text-xs" style="font-family:'Inter',sans-serif;color:#444651;">暂未上传简历</p>
+            <p v-if="resumeUploadError" class="text-xs mt-2" style="font-family:'Inter',sans-serif;color:#ba1a1a;">{{ resumeUploadError }}</p>
           </div>
           <div class="flex flex-col gap-2">
-            <button class="w-full py-2 rounded-lg text-sm font-semibold transition-colors"
-                    style="background-color: #dce9ff; color: #444651; font-family: 'Inter', sans-serif;"
-                    onmouseover="this.style.backgroundColor='#d3e4fe'"
-                    onmouseout="this.style.backgroundColor='#dce9ff'">
-              替换文件
+            <button
+              class="w-full py-2 rounded-lg text-sm font-semibold transition-colors"
+              :disabled="resumeUploading"
+              :style="resumeUploading ? 'background-color:#d3e4fe;color:#c5c5d3;cursor:not-allowed;font-family:Inter,sans-serif;' : 'background-color:#dce9ff;color:#444651;cursor:pointer;font-family:Inter,sans-serif;'"
+              @click="triggerResumeUpload">
+              {{ resumeUploading ? '解析中...' : hasResume ? '替换文件' : '上传简历' }}
             </button>
             <button class="w-full py-2 rounded-lg text-sm font-semibold transition-colors"
                     style="background: transparent; color: #00236f; font-family: 'Inter', sans-serif;"
                     onmouseover="this.style.backgroundColor='rgba(0,35,111,0.05)'"
-                    onmouseout="this.style.backgroundColor='transparent'">
+                    onmouseout="this.style.backgroundColor='transparent'"
+                    @click="openResumeModal">
               查看解析
             </button>
           </div>
@@ -634,6 +1173,463 @@ async function goToPage(page: number) {
       </aside>
 
     </main>
+
+    <!-- Resume Modal -->
+    <div v-if="resumeModalOpen"
+         class="fixed inset-0 z-50 flex items-center justify-center"
+         style="background: rgba(11,28,48,0.5); backdrop-filter: blur(4px);">
+      <div class="rounded-2xl w-full mx-4 overflow-hidden flex flex-col"
+           style="max-width: 560px; max-height: 85vh; background: #ffffff; box-shadow: 0 24px 64px rgba(11,28,48,0.18);">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4" style="border-bottom: 1px solid #f0f0f5;">
+          <div class="flex items-center gap-2">
+            <button v-if="resumeDetail" @click="backToList"
+                    style="color:#00236f;background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center;">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;">
+                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+              </svg>
+            </button>
+            <h3 class="font-semibold" style="font-family:'Inter',sans-serif;font-size:16px;color:#0b1c30;">
+              {{ resumeDetail ? (isEditing ? '编辑简历' : '解析详情') : '我的简历' }}
+            </h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <!-- 详情页：编辑 / 保存 / 取消 -->
+            <template v-if="resumeDetail && !resumeModalLoading">
+              <template v-if="!isEditing">
+                <button @click="startEditing"
+                        class="px-3 py-1 rounded-lg text-xs font-semibold"
+                        style="background:#dce9ff;color:#00236f;border:none;cursor:pointer;font-family:'Inter',sans-serif;">
+                  编辑
+                </button>
+              </template>
+              <template v-else>
+                <button @click="saveEdit" :disabled="isSaving"
+                        class="px-3 py-1 rounded-lg text-xs font-semibold"
+                        :style="isSaving ? 'background:#d3e4fe;color:#c5c5d3;cursor:not-allowed;border:none;font-family:Inter,sans-serif;' : 'background:#00236f;color:#fff;cursor:pointer;border:none;font-family:Inter,sans-serif;'">
+                  {{ isSaving ? '保存中...' : '保存' }}
+                </button>
+                <button @click="isEditing = false" :disabled="isSaving"
+                        class="px-3 py-1 rounded-lg text-xs font-semibold"
+                        style="background:#f0f0f5;color:#444651;border:none;cursor:pointer;font-family:'Inter',sans-serif;">
+                  取消
+                </button>
+              </template>
+            </template>
+            <button @click="closeResumeModal"
+                    style="color:#757682;background:none;border:none;cursor:pointer;padding:4px;">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:20px;height:20px;">
+                <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading -->
+        <div v-if="resumeModalLoading" class="flex items-center justify-center py-16">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+            <div style="display:flex;gap:7px;">
+              <span class="dot dot-1"></span><span class="dot dot-2"></span><span class="dot dot-3"></span>
+            </div>
+            <p style="font-family:'Inter',sans-serif;color:#8c93a8;font-size:13px;">正在加载...</p>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div v-else-if="resumeModalError" class="px-6 py-10 text-center">
+          <p style="font-family:'Inter',sans-serif;color:#ba1a1a;font-size:14px;">{{ resumeModalError }}</p>
+          <button v-if="resumeDetail" @click="backToList" class="mt-4 text-sm" style="color:#00236f;background:none;border:none;cursor:pointer;">返回列表</button>
+        </div>
+
+        <!-- 列表视图 -->
+        <div v-else-if="!resumeDetail" class="overflow-y-auto">
+          <div v-if="!resumeList.length" class="px-6 py-12 text-center">
+            <p style="font-family:'Inter',sans-serif;color:#757682;font-size:14px;">暂无已解析的简历</p>
+          </div>
+          <div v-for="item in resumeList" :key="item.id"
+               class="flex items-center justify-between px-6 py-4 cursor-pointer transition-colors"
+               style="border-bottom:1px solid #f0f0f5;"
+               onmouseover="this.style.background='#f8faff'"
+               onmouseout="this.style.background=''"
+               @click="openResumeDetail(item.id)">
+            <div class="flex items-center gap-3 min-w-0">
+              <!-- 文件图标 -->
+              <div class="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center" style="background:#dce9ff;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;color:#00236f;">
+                  <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-semibold truncate" style="font-family:'Inter',sans-serif;color:#0b1c30;">{{ item.file_name }}</p>
+                <p class="text-xs" style="font-family:'Inter',sans-serif;color:#757682;">
+                  {{ item.name ?? '未识别姓名' }} · {{ formatDateTime(item.created_at) }}
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0 ml-3">
+              <span class="px-2 py-0.5 rounded-full text-xs font-semibold"
+                    :style="item.parse_status === 'success' ? 'background:#d1fae5;color:#065f46;' : 'background:#fee2e2;color:#991b1b;'">
+                {{ item.parse_status === 'success' ? '已解析' : item.parse_status }}
+              </span>
+              <!-- 删除按钮 -->
+              <button @click.stop="deleteResume(item.id)"
+                      :disabled="deletingId === item.id"
+                      style="background:none;border:none;cursor:pointer;color:#ba1a1a;padding:4px;display:flex;align-items:center;"
+                      title="删除">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;">
+                  <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                </svg>
+              </button>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;color:#c5c5d3;">
+                <path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- 详情视图 -->
+        <div v-else class="overflow-y-auto px-6 py-4 flex flex-col gap-5">
+          <!-- Basic Info - 查看模式 -->
+          <div v-if="!isEditing">
+            <p class="text-xs font-semibold tracking-widest uppercase mb-3" style="font-family:'JetBrains Mono',monospace;color:#444651;">基本信息</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div v-for="item in [
+                {label:'姓名', value: resumeDetail.name},
+                {label:'邮箱', value: resumeDetail.email},
+                {label:'电话', value: resumeDetail.phone},
+                {label:'城市', value: resumeDetail.location},
+                {label:'工作年限', value: resumeDetail.total_years_exp != null ? resumeDetail.total_years_exp + ' 年' : null},
+              ].filter(i => i.value)" :key="item.label"
+                   class="rounded-lg px-3 py-2" style="background:#f4f6fb;">
+                <p class="text-xs" style="font-family:'Inter',sans-serif;color:#757682;">{{ item.label }}</p>
+                <p class="text-sm font-semibold" style="font-family:'Inter',sans-serif;color:#0b1c30;">{{ item.value }}</p>
+              </div>
+            </div>
+          </div>
+          <!-- Summary - 查看模式 -->
+          <div v-if="!isEditing && resumeDetail.summary">
+            <p class="text-xs font-semibold tracking-widest uppercase mb-2" style="font-family:'JetBrains Mono',monospace;color:#444651;">个人简介</p>
+            <p class="text-sm leading-relaxed" style="font-family:'Inter',sans-serif;color:#374151;">{{ resumeDetail.summary }}</p>
+          </div>
+
+          <!-- 编辑模式表单 -->
+          <div v-if="isEditing" class="flex flex-col gap-3">
+            <p class="text-xs font-semibold tracking-widest uppercase mb-1" style="font-family:'JetBrains Mono',monospace;color:#444651;">编辑基本信息</p>
+            <div class="grid grid-cols-2 gap-3">
+              <div v-for="field in [
+                {label:'姓名', key:'name', type:'text'},
+                {label:'邮箱', key:'email', type:'email'},
+                {label:'电话', key:'phone', type:'text'},
+                {label:'城市', key:'location', type:'text'},
+                {label:'工作年限（年）', key:'total_years_exp', type:'number'},
+              ]" :key="field.key" class="flex flex-col gap-1">
+                <label class="text-xs" style="font-family:'Inter',sans-serif;color:#757682;">{{ field.label }}</label>
+                <input
+                  v-model="editForm[field.key as keyof EditForm]"
+                  :type="field.type"
+                  :placeholder="field.label"
+                  class="rounded-lg px-3 py-2 text-sm w-full outline-none"
+                  style="background:#f4f6fb;border:1px solid #e0e0ea;font-family:'Inter',sans-serif;color:#0b1c30;"
+                  onfocus="this.style.borderColor='#00236f'"
+                  onblur="this.style.borderColor='#e0e0ea'"
+                />
+              </div>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs" style="font-family:'Inter',sans-serif;color:#757682;">个人简介</label>
+              <textarea
+                v-model="editForm.summary"
+                rows="4"
+                placeholder="个人简介"
+                class="rounded-lg px-3 py-2 text-sm w-full outline-none resize-none"
+                style="background:#f4f6fb;border:1px solid #e0e0ea;font-family:'Inter',sans-serif;color:#0b1c30;line-height:1.6;"
+                onfocus="this.style.borderColor='#00236f'"
+                onblur="this.style.borderColor='#e0e0ea'"
+              ></textarea>
+            </div>
+            <p v-if="resumeModalError" class="text-xs" style="color:#ba1a1a;font-family:'Inter',sans-serif;">{{ resumeModalError }}</p>
+          </div>
+          <!-- Skills 查看 -->
+          <div v-if="!isEditing && resumeDetail.skills?.length">
+            <p class="text-xs font-semibold tracking-widest uppercase mb-2" style="font-family:'JetBrains Mono',monospace;color:#444651;">技能</p>
+            <div class="flex flex-wrap gap-2">
+              <span v-for="skill in resumeDetail.skills" :key="skill"
+                    class="px-2 py-1 rounded-full text-xs font-semibold"
+                    style="background:#dce9ff;color:#00236f;font-family:'Inter',sans-serif;">{{ skill }}</span>
+            </div>
+          </div>
+          <!-- Skills 编辑 -->
+          <div v-if="isEditing">
+            <p class="text-xs font-semibold tracking-widest uppercase mb-2" style="font-family:'JetBrains Mono',monospace;color:#444651;">技能</p>
+            <div class="flex flex-wrap gap-2 mb-2">
+              <span v-for="(skill, idx) in editSkills" :key="skill"
+                    class="flex items-center gap-1 pl-2 pr-1 py-1 rounded-full text-xs font-semibold"
+                    style="background:#dce9ff;color:#00236f;font-family:'Inter',sans-serif;">
+                {{ skill }}
+                <button @click="removeSkill(idx)"
+                        style="background:none;border:none;cursor:pointer;color:#00236f;padding:0;line-height:1;display:flex;align-items:center;">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:13px;height:13px;">
+                    <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                  </svg>
+                </button>
+              </span>
+            </div>
+            <div class="flex gap-2">
+              <input v-model="newSkillInput"
+                     placeholder="输入技能后按回车或点添加"
+                     class="flex-1 rounded-lg px-3 py-1.5 text-sm outline-none"
+                     style="background:#f4f6fb;border:1px solid #e0e0ea;font-family:'Inter',sans-serif;"
+                     @keydown.enter.prevent="addSkill"
+                     onfocus="this.style.borderColor='#00236f'"
+                     onblur="this.style.borderColor='#e0e0ea'" />
+              <button @click="addSkill"
+                      class="px-3 py-1.5 rounded-lg text-xs font-semibold"
+                      style="background:#dce9ff;color:#00236f;border:none;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;">
+                + 添加
+              </button>
+            </div>
+          </div>
+          <!-- Work Experiences -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-xs font-semibold tracking-widest uppercase" style="font-family:'JetBrains Mono',monospace;color:#444651;">工作经历</p>
+              <button @click="startAddWorkExp" style="background:none;border:none;cursor:pointer;color:#00236f;font-size:12px;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:3px;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> 添加
+              </button>
+            </div>
+            <div class="flex flex-col gap-3">
+              <template v-for="w in resumeDetail.work_experiences" :key="w.id">
+                <!-- 编辑表单 -->
+                <div v-if="editingWorkExpId === w.id" class="rounded-lg p-4 flex flex-col gap-2" style="background:#f0f4ff;border:1px solid #c7d9ff;">
+                  <div class="grid grid-cols-2 gap-2">
+                    <div><label class="text-xs" style="color:#757682;">公司 *</label><input v-model="workExpForm.company" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                    <div><label class="text-xs" style="color:#757682;">职位</label><input v-model="workExpForm.title" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                    <div><label class="text-xs" style="color:#757682;">开始时间</label><input v-model="workExpForm.start_date" type="month" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                    <div><label class="text-xs" style="color:#757682;">结束时间（至今留空）</label><input v-model="workExpForm.end_date" type="month" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  </div>
+                  <div><label class="text-xs" style="color:#757682;">工作描述</label><textarea v-model="workExpForm.description" rows="3" class="w-full rounded px-2 py-1 text-sm outline-none mt-1 resize-none" style="background:#fff;border:1px solid #d0d5e8;"></textarea></div>
+                  <div><label class="text-xs" style="color:#757682;">技术栈（逗号分隔）</label><input v-model="workExpForm.tech_stack" placeholder="Vue, FastAPI, MySQL" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  <div class="flex gap-2 justify-end">
+                    <button @click="editingWorkExpId = null" class="px-3 py-1 rounded text-xs" style="background:#f0f0f5;border:none;cursor:pointer;color:#444651;">取消</button>
+                    <button @click="saveWorkExp" :disabled="savingWorkExp" class="px-3 py-1 rounded text-xs" style="background:#00236f;border:none;cursor:pointer;color:#fff;">{{ savingWorkExp ? '保存中...' : '保存' }}</button>
+                  </div>
+                </div>
+                <!-- 查看卡片 -->
+                <div v-else class="rounded-lg p-4" style="background:#f4f6fb;">
+                  <div class="flex items-start justify-between gap-2 mb-1">
+                    <p class="font-semibold text-sm" style="font-family:'Inter',sans-serif;color:#0b1c30;">{{ w.company }}</p>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                      <p class="text-xs" style="font-family:'JetBrains Mono',monospace;color:#757682;">{{ w.start_date }}{{ w.end_date ? ' – ' + w.end_date : ' – 至今' }}</p>
+                      <button @click="startEditWorkExp(w)" style="background:none;border:none;cursor:pointer;color:#00236f;padding:0;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
+                      <button @click="deleteWorkExp(w.id!)" style="background:none;border:none;cursor:pointer;color:#ba1a1a;padding:0;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+                    </div>
+                  </div>
+                  <p v-if="w.title" class="text-xs mb-2" style="font-family:'Inter',sans-serif;color:#444651;">{{ w.title }}</p>
+                  <p v-if="w.description" class="text-xs leading-relaxed mb-2" style="font-family:'Inter',sans-serif;color:#6b7280;white-space:pre-wrap;">{{ w.description }}</p>
+                  <div v-if="w.tech_stack?.length" class="flex flex-wrap gap-1">
+                    <span v-for="t in w.tech_stack" :key="t" class="px-2 py-0.5 rounded text-xs" style="background:#e1e0ff;color:#0d0097;">{{ t }}</span>
+                  </div>
+                </div>
+              </template>
+              <!-- 新增表单 -->
+              <div v-if="editingWorkExpId === 'new'" class="rounded-lg p-4 flex flex-col gap-2" style="background:#f0f4ff;border:1px solid #c7d9ff;">
+                <div class="grid grid-cols-2 gap-2">
+                  <div><label class="text-xs" style="color:#757682;">公司 *</label><input v-model="workExpForm.company" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  <div><label class="text-xs" style="color:#757682;">职位</label><input v-model="workExpForm.title" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  <div><label class="text-xs" style="color:#757682;">开始时间</label><input v-model="workExpForm.start_date" placeholder="2023-01" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  <div><label class="text-xs" style="color:#757682;">结束时间</label><input v-model="workExpForm.end_date" placeholder="至今留空" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                </div>
+                <div><label class="text-xs" style="color:#757682;">工作描述</label><textarea v-model="workExpForm.description" rows="3" class="w-full rounded px-2 py-1 text-sm outline-none mt-1 resize-none" style="background:#fff;border:1px solid #d0d5e8;"></textarea></div>
+                <div><label class="text-xs" style="color:#757682;">技术栈（逗号分隔）</label><input v-model="workExpForm.tech_stack" placeholder="Vue, FastAPI, MySQL" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                <div class="flex gap-2 justify-end">
+                  <button @click="editingWorkExpId = null" class="px-3 py-1 rounded text-xs" style="background:#f0f0f5;border:none;cursor:pointer;color:#444651;">取消</button>
+                  <button @click="saveWorkExp" :disabled="savingWorkExp" class="px-3 py-1 rounded text-xs" style="background:#00236f;border:none;cursor:pointer;color:#fff;">{{ savingWorkExp ? '保存中...' : '保存' }}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Projects -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-xs font-semibold tracking-widest uppercase" style="font-family:'JetBrains Mono',monospace;color:#444651;">项目经历</p>
+              <button v-if="isEditing" @click="startAddProject" style="background:none;border:none;cursor:pointer;color:#00236f;font-size:12px;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:3px;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> 添加
+              </button>
+            </div>
+            <div class="flex flex-col gap-3">
+              <template v-for="p in resumeDetail.projects" :key="p.id">
+                <!-- 编辑表单（仅 isEditing 时可触发） -->
+                <div v-if="editingProjectId === p.id" class="rounded-lg p-4 flex flex-col gap-2" style="background:#f0f4ff;border:1px solid #c7d9ff;">
+                  <div class="grid grid-cols-2 gap-2">
+                    <div><label class="text-xs" style="color:#757682;">项目名称 *</label><input v-model="projectForm.name" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                    <div><label class="text-xs" style="color:#757682;">担任角色</label><input v-model="projectForm.role" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                    <div><label class="text-xs" style="color:#757682;">开始时间</label><input v-model="projectForm.start_date" type="month" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                    <div><label class="text-xs" style="color:#757682;">结束时间（至今留空）</label><input v-model="projectForm.end_date" type="month" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  </div>
+                  <div><label class="text-xs" style="color:#757682;">项目描述</label><textarea v-model="projectForm.description" rows="10" class="w-full rounded px-2 py-1 text-sm outline-none mt-1 resize-none" style="background:#fff;border:1px solid #d0d5e8;"></textarea></div>
+                  <div><label class="text-xs" style="color:#757682;">技术栈（逗号分隔）</label><input v-model="projectForm.tech_stack" placeholder="Vue, FastAPI, MySQL" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  <div class="flex gap-2 justify-end">
+                    <button @click="editingProjectId = null" class="px-3 py-1 rounded text-xs" style="background:#f0f0f5;border:none;cursor:pointer;color:#444651;">取消</button>
+                    <button @click="saveProject" :disabled="savingProject" class="px-3 py-1 rounded text-xs" style="background:#00236f;border:none;cursor:pointer;color:#fff;">{{ savingProject ? '保存中...' : '保存' }}</button>
+                  </div>
+                </div>
+                <!-- 查看卡片 -->
+                <div v-else class="rounded-lg p-4" style="background:#f4f6fb;">
+                  <div class="flex items-start justify-between gap-2 mb-1">
+                    <p class="font-semibold text-sm" style="font-family:'Inter',sans-serif;color:#0b1c30;">{{ p.name }}</p>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                      <p class="text-xs" style="font-family:'JetBrains Mono',monospace;color:#757682;">{{ p.start_date }}{{ p.end_date ? ' – ' + p.end_date : p.start_date ? ' – 至今' : '' }}</p>
+                      <template v-if="isEditing">
+                        <button @click="startEditProject(p)" style="background:none;border:none;cursor:pointer;color:#00236f;padding:0;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
+                        <button @click="deleteProject(p.id!)" style="background:none;border:none;cursor:pointer;color:#ba1a1a;padding:0;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+                      </template>
+                    </div>
+                  </div>
+                  <p v-if="p.role" class="text-xs mb-2" style="font-family:'Inter',sans-serif;color:#444651;">{{ p.role }}</p>
+                  <p v-if="p.description" class="text-xs leading-relaxed mb-2" style="font-family:'Inter',sans-serif;color:#6b7280;white-space:pre-wrap;">{{ p.description }}</p>
+                  <div v-if="p.tech_stack?.length" class="flex flex-wrap gap-1">
+                    <span v-for="t in p.tech_stack" :key="t" class="px-2 py-0.5 rounded text-xs" style="background:#e1e0ff;color:#0d0097;">{{ t }}</span>
+                  </div>
+                </div>
+              </template>
+              <!-- 新增表单 -->
+              <div v-if="editingProjectId === 'new'" class="rounded-lg p-4 flex flex-col gap-2" style="background:#f0f4ff;border:1px solid #c7d9ff;">
+                <div class="grid grid-cols-2 gap-2">
+                  <div><label class="text-xs" style="color:#757682;">项目名称 *</label><input v-model="projectForm.name" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  <div><label class="text-xs" style="color:#757682;">担任角色</label><input v-model="projectForm.role" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  <div><label class="text-xs" style="color:#757682;">开始时间</label><input v-model="projectForm.start_date" type="month" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  <div><label class="text-xs" style="color:#757682;">结束时间（至今留空）</label><input v-model="projectForm.end_date" type="month" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                </div>
+                <div><label class="text-xs" style="color:#757682;">项目描述</label><textarea v-model="projectForm.description" rows="5" class="w-full rounded px-2 py-1 text-sm outline-none mt-1 resize-none" style="background:#fff;border:1px solid #d0d5e8;"></textarea></div>
+                <div><label class="text-xs" style="color:#757682;">技术栈（逗号分隔）</label><input v-model="projectForm.tech_stack" placeholder="Vue, FastAPI, MySQL" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                <div class="flex gap-2 justify-end">
+                  <button @click="editingProjectId = null" class="px-3 py-1 rounded text-xs" style="background:#f0f0f5;border:none;cursor:pointer;color:#444651;">取消</button>
+                  <button @click="saveProject" :disabled="savingProject" class="px-3 py-1 rounded text-xs" style="background:#00236f;border:none;cursor:pointer;color:#fff;">{{ savingProject ? '保存中...' : '保存' }}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Educations -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-xs font-semibold tracking-widest uppercase" style="font-family:'JetBrains Mono',monospace;color:#444651;">教育经历</p>
+              <button v-if="isEditing" @click="startAddEdu" style="background:none;border:none;cursor:pointer;color:#00236f;font-size:12px;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:3px;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> 添加
+              </button>
+            </div>
+            <div class="flex flex-col gap-3">
+              <template v-for="e in resumeDetail.educations" :key="e.id">
+                <!-- 编辑表单 -->
+                <div v-if="editingEduId === e.id" class="rounded-lg p-4 flex flex-col gap-2" style="background:#f0f4ff;border:1px solid #c7d9ff;">
+                  <div class="grid grid-cols-2 gap-2">
+                    <div><label class="text-xs" style="color:#757682;">学校 *</label><input v-model="eduForm.school" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                    <div><label class="text-xs" style="color:#757682;">学历</label><input v-model="eduForm.degree" placeholder="本科/硕士/博士" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                    <div><label class="text-xs" style="color:#757682;">专业</label><input v-model="eduForm.major" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                    <div><label class="text-xs" style="color:#757682;">毕业年份</label><select v-model="eduForm.graduation_year" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;color:#0b1c30;"><option value="">请选择</option><option v-for="y in Array.from({length: 30}, (_, i) => new Date().getFullYear() + 6 - i)" :key="y" :value="String(y)">{{ y }}</option></select></div>
+                  </div>
+                  <div class="flex gap-2 justify-end">
+                    <button @click="editingEduId = null" class="px-3 py-1 rounded text-xs" style="background:#f0f0f5;border:none;cursor:pointer;color:#444651;">取消</button>
+                    <button @click="saveEdu" :disabled="savingEdu" class="px-3 py-1 rounded text-xs" style="background:#00236f;border:none;cursor:pointer;color:#fff;">{{ savingEdu ? '保存中...' : '保存' }}</button>
+                  </div>
+                </div>
+                <!-- 查看卡片 -->
+                <div v-else class="rounded-lg p-4 flex items-start justify-between gap-2" style="background:#f4f6fb;">
+                  <div>
+                    <p class="font-semibold text-sm" style="font-family:'Inter',sans-serif;color:#0b1c30;">{{ e.school }}</p>
+                    <p class="text-xs mt-1" style="font-family:'Inter',sans-serif;color:#444651;">
+                      {{ [e.degree, e.major, e.graduation_year ? e.graduation_year + ' 毕业' : null].filter(Boolean).join(' · ') || '-' }}
+                    </p>
+                  </div>
+                  <div v-if="isEditing" class="flex items-center gap-2 flex-shrink-0">
+                    <button @click="startEditEdu(e)" style="background:none;border:none;cursor:pointer;color:#00236f;padding:0;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg></button>
+                    <button @click="deleteEdu(e.id!)" style="background:none;border:none;cursor:pointer;color:#ba1a1a;padding:0;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>
+                  </div>
+                </div>
+              </template>
+              <!-- 新增表单 -->
+              <div v-if="editingEduId === 'new'" class="rounded-lg p-4 flex flex-col gap-2" style="background:#f0f4ff;border:1px solid #c7d9ff;">
+                <div class="grid grid-cols-2 gap-2">
+                  <div><label class="text-xs" style="color:#757682;">学校 *</label><input v-model="eduForm.school" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  <div><label class="text-xs" style="color:#757682;">学历</label><input v-model="eduForm.degree" placeholder="本科/硕士/博士" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  <div><label class="text-xs" style="color:#757682;">专业</label><input v-model="eduForm.major" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                  <div><label class="text-xs" style="color:#757682;">毕业年份</label><input v-model="eduForm.graduation_year" placeholder="2024" class="w-full rounded px-2 py-1 text-sm outline-none mt-1" style="background:#fff;border:1px solid #d0d5e8;" /></div>
+                </div>
+                <div class="flex gap-2 justify-end">
+                  <button @click="editingEduId = null" class="px-3 py-1 rounded text-xs" style="background:#f0f0f5;border:none;cursor:pointer;color:#444651;">取消</button>
+                  <button @click="saveEdu" :disabled="savingEdu" class="px-3 py-1 rounded text-xs" style="background:#00236f;border:none;cursor:pointer;color:#fff;">{{ savingEdu ? '保存中...' : '保存' }}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="fixed bottom-6 right-6 z-[70] flex flex-col gap-2" style="max-width:320px;">
+      <transition-group name="toast">
+        <div v-for="toast in toasts" :key="toast.id"
+             class="flex items-start gap-3 rounded-xl px-4 py-3 shadow-lg"
+             :style="toast.type === 'success' ? 'background:#0b1c30;border-left:3px solid #6cf8bb;'
+                   : toast.type === 'error'   ? 'background:#0b1c30;border-left:3px solid #ff6b6b;'
+                   :                            'background:#0b1c30;border-left:3px solid #90a8ff;'">
+          <!-- 图标 -->
+          <svg v-if="toast.type === 'success'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#6cf8bb" style="width:16px;height:16px;flex-shrink:0;margin-top:1px;">
+            <path d="m9 16.17-4.17-4.17-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+          </svg>
+          <svg v-else-if="toast.type === 'error'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ff6b6b" style="width:16px;height:16px;flex-shrink:0;margin-top:1px;">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#90a8ff" style="width:16px;height:16px;flex-shrink:0;margin-top:1px;">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+          </svg>
+          <p class="text-xs flex-1 leading-relaxed" style="font-family:'Inter',sans-serif;color:#e8eaf0;">{{ toast.message }}</p>
+          <button @click="removeToast(toast.id)" style="background:none;border:none;cursor:pointer;color:#757682;padding:0;flex-shrink:0;line-height:1;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px;">
+              <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </button>
+        </div>
+      </transition-group>
+    </div>
+
+    <!-- Confirm Dialog -->
+    <div v-if="confirmDialog.open"
+         class="fixed inset-0 z-[60] flex items-center justify-center"
+         style="background: rgba(11,28,48,0.45); backdrop-filter: blur(4px);">
+      <div class="rounded-2xl w-full mx-6 overflow-hidden"
+           style="max-width: 360px; background: #ffffff; box-shadow: 0 24px 64px rgba(11,28,48,0.18);">
+        <!-- Icon + Title -->
+        <div class="px-6 pt-6 pb-4 flex flex-col items-center text-center gap-3">
+          <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background:#fff1f1;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:24px;height:24px;color:#ba1a1a;">
+              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+            </svg>
+          </div>
+          <h3 class="font-semibold" style="font-family:'Inter',sans-serif;font-size:16px;color:#0b1c30;">{{ confirmDialog.title }}</h3>
+          <p class="text-sm" style="font-family:'Inter',sans-serif;color:#6b7280;line-height:1.6;">{{ confirmDialog.message }}</p>
+        </div>
+        <!-- Buttons -->
+        <div class="flex border-t" style="border-color:#f0f0f5;">
+          <button @click="onConfirmCancel"
+                  class="flex-1 py-4 text-sm font-semibold transition-colors"
+                  style="font-family:'Inter',sans-serif;color:#444651;background:none;border:none;cursor:pointer;border-right:1px solid #f0f0f5;"
+                  onmouseover="this.style.background='#f8f9ff'"
+                  onmouseout="this.style.background='none'">
+            取消
+          </button>
+          <button @click="onConfirmOk"
+                  class="flex-1 py-4 text-sm font-semibold transition-colors"
+                  style="font-family:'Inter',sans-serif;color:#ba1a1a;background:none;border:none;cursor:pointer;"
+                  onmouseover="this.style.background='#fff5f5'"
+                  onmouseout="this.style.background='none'">
+            确认删除
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Mobile Bottom Nav -->
     <nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-2 rounded-t-xl"
@@ -672,6 +1668,35 @@ async function goToPage(page: number) {
 @keyframes breathe {
   0%, 100% { transform: scale(1);   box-shadow: 0 8px 32px rgba(0,35,111,0.22); }
   50%       { transform: scale(1.08); box-shadow: 0 12px 40px rgba(0,35,111,0.34); }
+}
+
+/* 简历解析绕圈动画 */
+.resume-orbit {
+  animation: orbit-spin 1.2s linear infinite;
+  transform-origin: center;
+}
+@keyframes orbit-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Toast 通知动画 */
+.toast-enter-active {
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.toast-leave-active {
+  transition: all 0.22s ease-in;
+}
+.toast-enter-from {
+  opacity: 0;
+  transform: translateX(40px) scale(0.95);
+}
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(40px) scale(0.92);
+}
+.toast-move {
+  transition: transform 0.25s ease;
 }
 
 /* 三点波浪 */

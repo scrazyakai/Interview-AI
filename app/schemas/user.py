@@ -25,3 +25,9 @@ class PointRecordResponse(BaseModel):
 class PointRecordListResponse(BaseModel):
     total: int
     items: List[PointRecordResponse]
+
+
+class UserStatsResponse(BaseModel):
+    total_interviews: int
+    total_points: int
+    total_point_records: int

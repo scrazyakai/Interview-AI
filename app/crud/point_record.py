@@ -1,7 +1,7 @@
 from typing import List
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.point_record import PointRecordModel
@@ -28,7 +28,7 @@ async def get_point_records(session: AsyncSession, user_id: UUID, offset: int = 
         )
         for record in records
     ]
-async def get_records_total(session: AsyncSession,user_id: UUID):
-    stmt = select(PointRecordModel).where(PointRecordModel.user_id == user_id)
-    results = await session.execute(stmt)
-    return len(results.scalars().all())
+async def get_records_total(session: AsyncSession, user_id: UUID) -> int:
+    stmt = select(func.count()).select_from(PointRecordModel).where(PointRecordModel.user_id == user_id)
+    result = await session.execute(stmt)
+    return result.scalar() or 0
