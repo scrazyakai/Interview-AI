@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="p-5 lg:p-6">
     <form class="space-y-4" @submit.prevent="emit('submit')">
 
@@ -67,10 +67,47 @@
         ></textarea>
       </div>
 
-      <!-- Resume Upload -->
+      <!-- Resume Section -->
       <div class="space-y-1.5">
-        <label class="block font-mono text-xs font-semibold uppercase tracking-[0.05em] text-on-surface-variant">上传简历</label>
+        <label class="block font-mono text-xs font-semibold uppercase tracking-[0.05em] text-on-surface-variant">简历</label>
+
+        <!-- Profile resume chip (when a parsed resume exists from profile) -->
         <div
+          v-if="profileResume"
+          class="flex items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3"
+        >
+          <!-- icon -->
+          <div class="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg bg-secondary-container text-on-secondary-container">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;">
+              <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+            </svg>
+          </div>
+          <!-- info -->
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-on-surface truncate">{{ profileResume.fileName }}</p>
+            <div class="flex items-center gap-1.5 mt-0.5">
+              <span class="font-mono text-[10px] font-semibold uppercase tracking-wider text-secondary">来自个人中心</span>
+              <span class="text-outline">·</span>
+              <span class="text-xs text-on-surface-variant">已解析，直接用于面试</span>
+            </div>
+          </div>
+          <!-- clear button -->
+          <button
+            type="button"
+            class="shrink-0 flex h-7 w-7 items-center justify-center rounded-full text-outline transition-colors hover:bg-surface-container-high hover:text-on-surface"
+            title="移除，改用临时上传"
+            :disabled="loading"
+            @click="emit('clear-profile-resume')"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;">
+              <path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Fallback upload zone (when no profile resume or user cleared it) -->
+        <div
+          v-else
           class="group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low p-4 transition-colors hover:bg-surface-container-high"
           :class="isDragOver ? 'border-primary bg-surface-container-high' : ''"
           @click="fileInputRef?.click()"
@@ -142,6 +179,7 @@ defineProps<{
   mode: string
   jobDescription: string
   resumeFileName: string
+  profileResume: { fileName: string; personName?: string | null } | null
   helperTip: string
   loading: boolean
   disableSubmit: boolean
@@ -157,6 +195,7 @@ const emit = defineEmits<{
   'update:mode': [value: string]
   'update:jobDescription': [value: string]
   'file-selected': [file: File]
+  'clear-profile-resume': []
   back: []
   submit: []
 }>()

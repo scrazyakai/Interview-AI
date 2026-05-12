@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <main class="px-6 pt-16 lg:px-12 max-w-[1280px] mx-auto h-screen overflow-hidden flex flex-col">
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-12 flex-1 overflow-hidden py-3">
       <!-- Left Column: Intro & Feature Cards -->
@@ -70,6 +70,7 @@
             :mode="form.mode"
             :job-description="form.job_description"
             :resume-file-name="resumeFileName"
+            :profile-resume="profileResume ? { fileName: profileResume.file_name, personName: profileResume.name } : null"
             :helper-tip="setupPageMock.helperTip"
             :loading="submitting"
             :disable-submit="isSubmitDisabled"
@@ -82,6 +83,7 @@
             @update:mode="form.mode = $event"
             @update:job-description="form.job_description = $event"
             @file-selected="handleResumeFile"
+            @clear-profile-resume="clearProfileResume"
             @back="goHome"
             @submit="submitSetup"
           />
@@ -141,13 +143,59 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import FormSection from '../components/setup/FormSection.vue'
 import { experienceLevelOptions, jobTitleOptions, modeOptions } from '../constants/interviewOptions'
 import { setupPageMock } from '../mock/interviewSetupMock'
-import { createInterviewSession, saveInterviewSetup, type InterviewSetupPayload } from '../utils/auth'
+import {
+  API_BASE_URL,
+  createInterviewSession,
+  extractApiPayload,
+  loadAuthSession,
+  saveInterviewSetup,
+  type InterviewSetupPayload,
+} from '../utils/auth'
+
+type ResumeListItem = {
+  id: number
+  file_name: string
+  parse_status: string
+  name?: string | null
+}
+
+type ResumeParseResult = {
+  name?: string | null
+  email?: string | null
+  phone?: string | null
+  location?: string | null
+  summary?: string | null
+  skills?: string[]
+  total_years_exp?: number | null
+  work_experiences?: {
+    company: string
+    title?: string | null
+    start_date?: string | null
+    end_date?: string | null
+    description?: string | null
+    tech_stack?: string[]
+  }[]
+  projects?: {
+    name: string
+    role?: string | null
+    start_date?: string | null
+    end_date?: string | null
+    description?: string | null
+    tech_stack?: string[]
+  }[]
+  educations?: {
+    school: string
+    degree?: string | null
+    major?: string | null
+    graduation_year?: string | null
+  }[]
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -169,6 +217,87 @@ const submitting = ref(false)
 const errorMessage = ref('')
 const resumeFileName = ref('')
 const showTip = ref(true)
+
+const profileResume = ref<ResumeListItem | null>(null)
+
+onMounted(() => { loadProfileResume() })
+
+async function loadProfileResume() {
+  const session = loadAuthSession()
+  if (!session) return
+  try {
+    const response = await fetch(`${API_BASE_URL}/resume/list`, {
+      headers: { Authorization: `${session.token_type} ${session.access_token}` },
+    })
+    const data = await response.json().catch(() => null)
+    if (!response.ok) return
+    const list = extractApiPayload<ResumeListItem[]>(data)
+    if (!list) return
+    const parsed = list.find(r => r.parse_status === 'success')
+    if (parsed) profileResume.value = parsed
+  } catch { /* 静默失败，不影响正常上传流程 */ }
+}
+
+function clearProfileResume() {
+  profileResume.value = null
+  resumeFileName.value = ''
+  form.resume_text = ''
+}
+
+async function fetchAndFormatResume(id: number): Promise<string> {
+  const session = loadAuthSession()
+  if (!session) return ''
+  const response = await fetch(`${API_BASE_URL}/resume/result/${id}`, {
+    headers: { Authorization: `${session.token_type} ${session.access_token}` },
+  })
+  const data = await response.json().catch(() => null)
+  if (!response.ok) return ''
+  const result = extractApiPayload<ResumeParseResult>(data)
+  return result ? formatResumeForPrompt(result) : ''
+}
+
+function formatResumeForPrompt(r: ResumeParseResult): string {
+  const lines: string[] = []
+
+  if (r.name) lines.push(`姓名：${r.name}`)
+  if (r.email) lines.push(`邮箱：${r.email}`)
+  if (r.phone) lines.push(`电话：${r.phone}`)
+  if (r.location) lines.push(`所在地：${r.location}`)
+  if (r.total_years_exp != null) lines.push(`工作年限：${r.total_years_exp} 年`)
+  if (r.summary) lines.push(`\n个人简介：\n${r.summary}`)
+  if (r.skills?.length) lines.push(`\n技能：${r.skills.join(', ')}`)
+
+  if (r.work_experiences?.length) {
+    lines.push('\n工作经历：')
+    for (const w of r.work_experiences) {
+      const period = [w.start_date, w.end_date ?? '至今'].filter(Boolean).join(' – ')
+      lines.push(`  ${w.company}${w.title ? ` · ${w.title}` : ''}${period ? `（${period}）` : ''}`)
+      if (w.description) lines.push(`    ${w.description}`)
+      if (w.tech_stack?.length) lines.push(`    技术栈：${w.tech_stack.join(', ')}`)
+    }
+  }
+
+  if (r.projects?.length) {
+    lines.push('\n项目经历：')
+    for (const p of r.projects) {
+      const period = [p.start_date, p.end_date ?? '至今'].filter(Boolean).join(' – ')
+      lines.push(`  ${p.name}${p.role ? ` · ${p.role}` : ''}${period ? `（${period}）` : ''}`)
+      if (p.description) lines.push(`    ${p.description}`)
+      if (p.tech_stack?.length) lines.push(`    技术栈：${p.tech_stack.join(', ')}`)
+    }
+  }
+
+  if (r.educations?.length) {
+    lines.push('\n教育经历：')
+    for (const e of r.educations) {
+      const parts = [e.degree, e.major, e.graduation_year ? `${e.graduation_year} 毕业` : null]
+        .filter(Boolean).join(' · ')
+      lines.push(`  ${e.school}${parts ? `（${parts}）` : ''}`)
+    }
+  }
+
+  return lines.join('\n')
+}
 
 applyPrefillFromQuery()
 
@@ -226,12 +355,17 @@ async function submitSetup() {
   submitting.value = true
 
   try {
+    let resumeText = form.resume_text
+    if (profileResume.value) {
+      resumeText = await fetchAndFormatResume(profileResume.value.id)
+    }
+
     const session = await createInterviewSession({
       job_title: form.job_title,
       job_description: form.job_description.trim(),
       experience_level: form.experience_level,
       mode: form.mode,
-      resume_text: form.resume_text,
+      resume_text: resumeText,
     })
 
     form.session_uuid = session.session_uuid
@@ -241,7 +375,7 @@ async function submitSetup() {
       job_description: form.job_description.trim(),
       experience_level: form.experience_level,
       mode: form.mode,
-      resume_text: form.resume_text,
+      resume_text: resumeText,
       session_uuid: form.session_uuid,
     })
 
