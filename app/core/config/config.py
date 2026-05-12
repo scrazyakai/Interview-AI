@@ -45,7 +45,10 @@ class Settings(BaseSettings):
     EMBEDDING_BASE_URL: Optional[str] = None
     EMBEDDING_API_KEY: Optional[str] = None
     EMBEDDING_DIMENSION: Optional[int] = None
-
+    """千问模型：解析简历"""
+    QWEN_API_KEY:str
+    QWEN_MODEL:str
+    QWEN_API_URL:str
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",

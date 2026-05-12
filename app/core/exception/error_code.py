@@ -27,3 +27,8 @@ class ErrorCode:
     """embedding error code"""
     CHUNCK_IS_NONE = 40010
     VECTOR_IS_NONE = 40011
+    """简历相关"""
+    RESUME_IS_NONE = 40020
+    RESUME_TEXT_IS_NONE = 40021
+    RESUME_IS_NOT_UPLOAD = 40022
+    RESUME_PARSE_FILED = 40023

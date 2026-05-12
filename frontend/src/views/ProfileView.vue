@@ -219,7 +219,21 @@ function formatDateTime(value?: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
 
+  const diffMs = Date.now() - date.getTime()
+  const diffHours = diffMs / (1000 * 60 * 60)
+  const diffDays = diffMs / (1000 * 60 * 60 * 24)
+
+  if (diffHours < 24) {
+    const hours = Math.floor(diffHours)
+    return hours < 1 ? '刚刚' : `${hours}小时前`
+  }
+
+  if (diffDays < 3) {
+    return `${Math.floor(diffDays)}天前`
+  }
+
   return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -586,7 +600,7 @@ async function goToPage(page: number) {
                     style="background: transparent; color: #00236f; font-family: 'Inter', sans-serif;"
                     onmouseover="this.style.backgroundColor='rgba(0,35,111,0.05)'"
                     onmouseout="this.style.backgroundColor='transparent'">
-              查看分析
+              查看解析
             </button>
           </div>
         </div>
