@@ -34,6 +34,7 @@ class AuthService:
         to_encode = {
             "sub": str(user.user_id),
             "username": user.username,
+            "role": user.role_type,
             "exp": expire,
         }
 
@@ -70,7 +71,7 @@ class AuthService:
 
     async def register_user(self, username: str, password: str) -> UserModel:
         password_hash = self.hash_password(password)
-        user = UserModel(username=username, password_hash=password_hash)
+        user = UserModel(username=username, password_hash=password_hash, role_type=1)
 
         async with AsyncSessionLocal() as session:
             try:

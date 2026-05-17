@@ -10,6 +10,8 @@ from app.services.auth_service import AuthService
 security = HTTPBearer(auto_error=False)
 auth_service = AuthService()
 
+ROLE_ADMIN = 3
+
 
 async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
@@ -57,6 +59,29 @@ async def get_optional_user_id(
         return UUID(user_id_str)
     except ValueError:
         return None
+
+
+async def get_current_admin(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> UUID:
+    if not credentials:
+        raise BizException(
+            code=ErrorCode.INVALID_TOKEN,
+            message="登录已失效，请重新登录",
+        )
+    token = credentials.credentials
+    payload = auth_service.decode_token(token)
+    if not payload:
+        raise BizException(code=ErrorCode.INVALID_TOKEN, message="登录已失效，请重新登录")
+    if payload.get("role") != ROLE_ADMIN:
+        raise BizException(code=ErrorCode.ADMIN_REQUIRED, message="无权限，需要管理员身份")
+    user_id_str = payload.get("sub")
+    if not user_id_str:
+        raise BizException(code=ErrorCode.INVALID_TOKEN, message="登录信息无效")
+    try:
+        return UUID(user_id_str)
+    except ValueError as exc:
+        raise BizException(code=ErrorCode.INVALID_USER_ID, message="登录信息无效") from exc
 
 
 def parse_user_id_from_token(token: str) -> UUID:

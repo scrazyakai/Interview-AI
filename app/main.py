@@ -12,6 +12,7 @@ configure_logging()
 
 from app.api import auth, interview
 from app.api import user
+from app.api import admin
 from app.core.exception import register_exception_handlers
 
 
@@ -20,9 +21,11 @@ register_exception_handlers(app)
 
 app.include_router(auth.router)
 
-app.include_router(resume.router,dependencies=[Depends(get_current_user_id)])
-app.include_router(user.router,dependencies=[Depends(get_current_user_id)])
-app.include_router(interview.router,dependencies=[Depends(get_current_user_id)])
+app.include_router(resume.router, dependencies=[Depends(get_current_user_id)])
+app.include_router(user.router, dependencies=[Depends(get_current_user_id)])
+app.include_router(interview.router, dependencies=[Depends(get_current_user_id)])
+# admin 路由内部通过 get_current_admin 自行校验权限，不在此处添加全局依赖
+app.include_router(admin.router)
 
 app.add_middleware(
     CORSMiddleware,

@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import text, String, Integer, func, SmallInteger, BigInteger
+from sqlalchemy import ForeignKey, text, String, Integer, func, SmallInteger, BigInteger
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -60,4 +60,9 @@ class UserModel(Base):
         nullable=False,
         server_default=text("0"),
     )
-    role_type: Mapped[int] = mapped_column(SmallInteger)
+    role_type: Mapped[int] = mapped_column(
+        SmallInteger,
+        ForeignKey("interview.user_role.id", name="fk_user_role_type", ondelete="RESTRICT"),
+        nullable=False,
+        server_default=text("1"),
+    )
