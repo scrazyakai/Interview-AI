@@ -2,6 +2,16 @@
   access_token: string
   token_type: string
   username: string
+  role: number   // 1=普通用户  2=VIP  3=管理员
+}
+
+function decodeJwtRole(token: string): number {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof payload.role === 'number' ? payload.role : 1
+  } catch {
+    return 1
+  }
 }
 
 type ApiEnvelope<T> = {
@@ -86,6 +96,7 @@ function toTokenResponse(payload: unknown): TokenResponse | null {
     access_token: accessToken,
     token_type: typeof tokenType === 'string' && tokenType.trim() ? tokenType : 'bearer',
     username,
+    role: decodeJwtRole(accessToken),
   }
 }
 

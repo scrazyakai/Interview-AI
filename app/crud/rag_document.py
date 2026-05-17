@@ -4,7 +4,6 @@ from sqlalchemy import delete, func, select, update
 
 from app.models.rag_document import RagDocument
 from app.models.rag_document_chunk import RagDocumentChunk
-from app.models.user import UserModel
 
 
 # ── 文档 ─────────────────────────────────────────────────────
@@ -88,54 +87,20 @@ async def delete_chunks_by_doc(session, doc_id: int) -> None:
     )
 
 
-# ── 用户管理（admin 视角） ─────────────────────────────────────
+# ── 文档统计 ─────────────────────────────────────────────────
 
-async def list_users(
-    session, offset: int = 0, limit: int = 20
-) -> tuple[list[UserModel], int]:
-    count_result = await session.execute(select(func.count()).select_from(UserModel))
-    total = count_result.scalar_one()
+async def count_documents(session) -> int:
+    result = await session.execute(select(func.count()).select_from(RagDocument))
+    return result.scalar_one()
+
+
+async def count_chunks(session) -> int:
+    result = await session.execute(select(func.count()).select_from(RagDocumentChunk))
+    return result.scalar_one()
+
+
+async def count_indexed_documents(session) -> int:
     result = await session.execute(
-        select(UserModel)
-        .order_by(UserModel.created_at.desc())
-        .offset(offset)
-        .limit(limit)
+        select(func.count()).select_from(RagDocument).where(RagDocument.status == "indexed")
     )
-    return result.scalars().all(), total
-
-
-async def update_user_role(session, user_id: UUID, role_type: int) -> UserModel | None:
-    result = await session.execute(
-        select(UserModel).where(UserModel.user_id == user_id)
-    )
-    user = result.scalars().first()
-    if user is None:
-        return None
-    user.role_type = role_type
-    await session.flush()
-    return user
-
-
-# ── 统计 ─────────────────────────────────────────────────────
-
-async def get_stats(session) -> dict:
-    total_users = (
-        await session.execute(select(func.count()).select_from(UserModel))
-    ).scalar_one()
-    total_docs = (
-        await session.execute(select(func.count()).select_from(RagDocument))
-    ).scalar_one()
-    total_chunks = (
-        await session.execute(select(func.count()).select_from(RagDocumentChunk))
-    ).scalar_one()
-    indexed_docs = (
-        await session.execute(
-            select(func.count()).select_from(RagDocument).where(RagDocument.status == "indexed")
-        )
-    ).scalar_one()
-    return {
-        "total_users": total_users,
-        "total_documents": total_docs,
-        "total_chunks": total_chunks,
-        "indexed_documents": indexed_docs,
-    }
+    return result.scalar_one()

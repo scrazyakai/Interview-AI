@@ -12,8 +12,8 @@ from app.db.base import Base
 class RagDocument(Base):
     """上传的原始文档，保留完整内容"""
 
-    __tablename__ = "documents"
-    __table_args__ = {"schema": "rag"}
+    __tablename__ = "rag_documents"
+    __table_args__ = {"schema": "interview"}
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 

@@ -15,14 +15,14 @@ EMBEDDING_DIM: int = settings.EMBEDDING_DIMENSION or 1024
 class RagDocumentChunk(Base):
     """文档分块及其向量嵌入"""
 
-    __tablename__ = "document_chunks"
-    __table_args__ = {"schema": "rag"}
+    __tablename__ = "rag_document_chunks"
+    __table_args__ = {"schema": "interview"}
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
     doc_id: Mapped[int] = mapped_column(
         BigInteger,
-        ForeignKey("rag.documents.id", ondelete="CASCADE"),
+        ForeignKey("interview.rag_documents.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

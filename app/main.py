@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.params import Depends
+import app.models  # 确保所有模型注册到 SQLAlchemy metadata
 from app.api import resume
 from starlette.middleware.cors import CORSMiddleware
 

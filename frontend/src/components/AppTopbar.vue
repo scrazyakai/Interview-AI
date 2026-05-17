@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { clearAuthSession, loadAuthSession, type TokenResponse } from '../utils/auth'
 import LoginModal from './LoginModal.vue'
@@ -9,6 +9,7 @@ const router = useRouter()
 const route = useRoute()
 
 const session = ref<TokenResponse | null>(loadAuthSession())
+const isAdmin = computed(() => session.value?.role === 3)
 const showLoginModal = ref(false)
 const showRegisterModal = ref(false)
 const dropdownVisible = ref(false)
@@ -50,6 +51,11 @@ function handleLogout() {
 function goProfile() {
   dropdownVisible.value = false
   router.push('/profile')
+}
+
+function goAdmin() {
+  dropdownVisible.value = false
+  router.push('/admin')
 }
 
 onMounted(() => {
@@ -237,6 +243,36 @@ onUnmounted(() => {
               </svg>
               <span style="font-size:14px;font-weight:600;color:#0b1c30;">个人中心</span>
             </button>
+
+            <!-- 管理后台入口：仅 role=3 可见 -->
+            <template v-if="isAdmin">
+              <div style="margin: 0 12px; border-top: 1px solid rgba(197,197,211,0.2);"></div>
+              <button
+                type="button"
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  width: 100%;
+                  box-sizing: border-box;
+                  padding: 11px 16px;
+                  border: none;
+                  background: transparent;
+                  text-align: left;
+                  cursor: pointer;
+                  font-family: 'Inter', sans-serif;
+                  transition: background 0.12s;
+                "
+                @mouseenter="($event.currentTarget as HTMLElement).style.background='rgba(124,58,237,0.07)'"
+                @mouseleave="($event.currentTarget as HTMLElement).style.background='transparent'"
+                @click="goAdmin"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;color:#7c3aed;flex-shrink:0;">
+                  <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 14H9V9h2v6zm4 0h-2V9h2v6z"/>
+                </svg>
+                <span style="font-size:14px;font-weight:600;color:#7c3aed;">管理后台</span>
+              </button>
+            </template>
 
             <div style="margin: 0 12px; border-top: 1px solid rgba(197,197,211,0.2);"></div>
 

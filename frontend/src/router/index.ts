@@ -5,6 +5,7 @@ import InterviewSetupView from '../views/InterviewSetupView.vue'
 import LoginView from '../views/LoginView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import ResultsView from '../views/ResultsView.vue'
+import AdminView from '../views/AdminView.vue'
 import { loadAuthSession, loadInterviewSetup } from '../utils/auth'
 
 const router = createRouter({
@@ -43,12 +44,24 @@ const router = createRouter({
       name: 'results',
       component: ResultsView,
     },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: AdminView,
+      meta: { requiresAuth: true, requiresAdmin: true },
+    },
   ],
 })
 
 router.beforeEach((to) => {
-  if (to.meta.requiresAuth && !loadAuthSession()) {
+  const session = loadAuthSession()
+
+  if (to.meta.requiresAuth && !session) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  if (to.meta.requiresAdmin && session?.role !== 3) {
+    return { name: 'home' }
   }
 
   if (to.meta.requiresInterviewSetup && !loadInterviewSetup()) {

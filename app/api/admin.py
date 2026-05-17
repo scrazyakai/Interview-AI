@@ -17,9 +17,9 @@
 """
 
 import pdfplumber
+from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
 
 from app.common.dependencies import get_current_admin
 from app.core.exception import BizException, ErrorCode
@@ -27,6 +27,7 @@ from app.core.exception.response import ApiResponse
 from app.crud import rag_document as rag_crud
 from app.db.session import get_session
 from app.rag.index_construction import build_document_index
+from app.services import admin_service
 from app.schemas.admin import (
     AdminStatsResponse,
     AdminUserListResponse,
@@ -51,8 +52,7 @@ async def list_users(
     admin_id: UUID = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ):
-    offset = (page - 1) * page_size
-    users, total = await rag_crud.list_users(session, offset=offset, limit=page_size)
+    users, total = await admin_service.list_users(session, page=page, page_size=page_size)
     return ApiResponse.success(
         AdminUserListResponse(total=total, items=users),
         message="查询成功",
@@ -66,9 +66,7 @@ async def update_user_role(
     admin_id: UUID = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ):
-    user = await rag_crud.update_user_role(session, user_id, body.role_type)
-    if user is None:
-        raise BizException(code=ErrorCode.USER_NOT_FOUND, message="用户不存在")
+    await admin_service.update_user_role(session, user_id, body.role_type)
     await session.commit()
     return ApiResponse.success(message="角色更新成功")
 
@@ -194,8 +192,8 @@ async def get_stats(
     admin_id: UUID = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ):
-    stats = await rag_crud.get_stats(session)
-    return ApiResponse.success(AdminStatsResponse(**stats))
+    stats = await admin_service.get_stats(session)
+    return ApiResponse.success(stats)
 
 
 # ── 内部工具 ──────────────────────────────────────────────────
