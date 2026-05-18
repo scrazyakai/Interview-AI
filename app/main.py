@@ -12,6 +12,7 @@ load_dotenv()
 configure_logging()
 
 from app.api import auth, interview
+from app.api.interview import ws_router as interview_ws_router
 from app.api import user
 from app.api import admin
 from app.core.exception import register_exception_handlers
@@ -25,6 +26,7 @@ app.include_router(auth.router)
 app.include_router(resume.router, dependencies=[Depends(get_current_user_id)])
 app.include_router(user.router, dependencies=[Depends(get_current_user_id)])
 app.include_router(interview.router, dependencies=[Depends(get_current_user_id)])
+app.include_router(interview_ws_router)  # WebSocket 不走 HTTPBearer，自行校验 token
 # admin 路由内部通过 get_current_admin 自行校验权限，不在此处添加全局依赖
 app.include_router(admin.router)
 

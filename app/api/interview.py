@@ -16,6 +16,8 @@ from app.schemas.interview_session import SessionHistoryListResponse
 from app.services.interview_service import interview_service
 
 router = APIRouter(prefix="/api/interview", tags=["interview"])
+# WebSocket 路由单独放，不加 HTTPBearer 依赖（自行从 query param 鉴权）
+ws_router = APIRouter(prefix="/api/interview", tags=["interview"])
 
 
 @router.post("/chat", response_model=ApiResponse[InterviewResponse])
@@ -32,7 +34,7 @@ async def chat(message: str = Body(..., embed=True)) -> ApiResponse[InterviewRes
     return ApiResponse.success(data=InterviewResponse(**response))
 
 
-@router.websocket("/ws")
+@ws_router.websocket("/ws")
 async def interview_ws(websocket: WebSocket) -> None:
     token = websocket.query_params.get("token", "").strip()
     session_uuid_raw = websocket.query_params.get("session_uuid", "").strip()

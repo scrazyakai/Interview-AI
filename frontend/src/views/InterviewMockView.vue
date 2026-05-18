@@ -510,11 +510,11 @@ function convertFloat32ToInt16(buffer: Float32Array) {
   return pcm
 }
 
-function decodeFloat32PcmChunk(chunk: ArrayBuffer) {
+function decodeInt16PcmChunk(chunk: ArrayBuffer) {
   const view = new DataView(chunk)
-  const samples = new Float32Array(chunk.byteLength / 4)
+  const samples = new Float32Array(chunk.byteLength / 2)
   for (let index = 0; index < samples.length; index += 1) {
-    samples[index] = view.getFloat32(index * 4, true)
+    samples[index] = view.getInt16(index * 2, true) / 32768.0
   }
   return samples
 }
@@ -538,7 +538,7 @@ async function playAudioChunk(chunk: ArrayBuffer) {
   await ensureOutputAudioContext()
   if (!outputAudioContext) return
 
-  const samples = decodeFloat32PcmChunk(chunk)
+  const samples = decodeInt16PcmChunk(chunk)
   const audioBuffer = outputAudioContext.createBuffer(1, samples.length, 24000)
   audioBuffer.copyToChannel(samples, 0)
   const source = outputAudioContext.createBufferSource()

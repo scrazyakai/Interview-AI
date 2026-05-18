@@ -1,85 +1,50 @@
-﻿import os
-import uuid
 from pathlib import Path
-from typing import Any
 
 from app.core.config.config import settings
+from app.core.log import get_logger
 from app.models.interview_session import InterviewSession
+from app.rag.retrieval import format_context, retrieve
+
+log = get_logger(__name__)
 
 
+async def build_instructions(interview: InterviewSession | None = None) -> str:
+    prompt_path = settings.QWEN_REALTIME_SYSTEM_ROLE
+    if not prompt_path:
+        raise ValueError("Missing QWEN_REALTIME_SYSTEM_ROLE")
 
+    template = Path(prompt_path).read_text(encoding="utf-8").strip()
 
-def build_realtime_ws_config() -> dict[str, Any]:
-    app_id = settings.VOLC_REALTIME_APP_ID
-    access_key = settings.VOLC_REALTIME_ACCESS_KEY
-    resource_id = settings.VOLC_REALTIME_RESOURCE_ID
-    app_key = settings.VOLC_REALTIME_APP_KEY
-    base_url = settings.VOLC_REALTIME_URL
+    # ── RAG 检索 ──────────────────────────────────────────────
+    # 用 job_title + job_description 前 300 字拼成查询，覆盖岗位的核心技术域
+    # job_description 截断是为了避免查询向量被过长文本稀释，重点放在核心词上
+    rag_context = ""
+    if interview:
+        job_title = getattr(interview, "job_title", "") or ""
+        job_desc = getattr(interview, "job_description", "") or ""
+        query = f"{job_title} {job_desc[:300]}".strip()
 
-    if not app_id or not access_key:
-        raise ValueError(
-            "Missing Doubao realtime credentials. Set VOLC_REALTIME_APP_ID and VOLC_REALTIME_ACCESS_KEY."
-        )
+        if query:
+            try:
+                chunks = await retrieve(query, top_k=6)
+                raw_context = format_context(chunks, max_chars=3000)
+                # 只有检索到内容时才生成区块标题，避免 prompt 出现空段落
+                if raw_context:
+                    rag_context = (
+                        "以下内容来自知识库，可作为出题和评估参考，"
+                        "优先结合以下知识点进行提问：\n\n"
+                        + raw_context
+                    )
+            except Exception:
+                # 检索失败不应中断面试，降级为无知识库模式
+                log.exception("RAG 检索失败，降级为无知识库模式")
 
-    return {
-        "base_url": base_url,
-        "headers": {
-            "X-Api-App-ID": app_id,
-            "X-Api-Access-Key": access_key,
-            "X-Api-Resource-Id": resource_id,
-            "X-Api-App-Key": app_key,
-            "X-Api-Connect-Id": str(uuid.uuid4()),
-        },
-    }
-
-
-async def build_start_session_payload(
-    interview: InterviewSession | None = None,
-    input_mod: str = "text",
-) -> dict[str, Any]:
-    role_prompt_path = settings.VOLC_REALTIME_SYSTEM_ROLE
-    if not role_prompt_path:
-        raise ValueError("Missing VOLC_REALTIME_SYSTEM_ROLE")
-
-    system_role_template = Path(role_prompt_path).read_text(encoding="utf-8").strip()
-    interview_data = {
-        "job_function": getattr(interview, "job_function", "") or "",
-        "job_title": getattr(interview, "job_title", "") or "",
-        "job_description": getattr(interview, "job_description", "") or "",
-        "experience_level": getattr(interview, "experience_level", "") or "",
-        "mode": getattr(interview, "mode", "") or "",
-        "resume_text": getattr(interview, "resume_text", "") or "",
-    }
-    system_role = system_role_template.format(**interview_data)
-
-    return {
-        "asr": {
-            "audio_config": {
-                "channel": 1,
-                "format": settings.VOLC_REALTIME_INPUT_FORMAT,
-                "sample_rate": int(settings.VOLC_REALTIME_INPUT_SAMPLE_RATE),
-            },
-            "extra": {
-                "enable_custom_vad" : True,
-                "end_smooth_window_ms": int(settings.VOLC_REALTIME_END_SMOOTH_WINDOW_MS),
-            },
-        },
-        "tts": {
-            "speaker": settings.VOLC_REALTIME_SPEAKER,
-            "audio_config": {
-                "channel": 1,
-                "format": settings.VOLC_REALTIME_OUTPUT_FORMAT,
-                "sample_rate": int(settings.VOLC_REALTIME_OUTPUT_SAMPLE_RATE),
-            },
-        },
-        "dialog": {
-            "bot_name": settings.VOLC_REALTIME_BOT_NAME,
-            "system_role": system_role,
-            "speaking_style": settings.VOLC_REALTIME_SPEAKING_STYLE,
-            "extra": {
-                "strict_audit": False,
-                "recv_timeout": int(settings.VOLC_REALTIME_RECV_TIMEOUT),
-                "input_mod": input_mod,
-            },
-        },
-    }
+    return template.format(
+        job_function=getattr(interview, "job_function", "") or "",
+        job_title=getattr(interview, "job_title", "") or "",
+        job_description=getattr(interview, "job_description", "") or "",
+        experience_level=getattr(interview, "experience_level", "") or "",
+        mode=getattr(interview, "mode", "") or "",
+        resume_text=getattr(interview, "resume_text", "") or "",
+        rag_context=rag_context,
+    )

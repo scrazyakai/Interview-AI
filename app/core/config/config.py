@@ -23,22 +23,11 @@ class Settings(BaseSettings):
     VOLC_BASE_URL: str
     VOLC_MODEL: str
 
-    """豆包实时语音对话配置"""
-    VOLC_REALTIME_APP_ID: str
-    VOLC_REALTIME_ACCESS_KEY: str
-    VOLC_REALTIME_URL: str
-    VOLC_REALTIME_RESOURCE_ID: str
-    VOLC_REALTIME_APP_KEY: str
-    VOLC_REALTIME_SPEAKER: str
-    VOLC_REALTIME_OUTPUT_FORMAT: str
-    VOLC_REALTIME_OUTPUT_SAMPLE_RATE: int
-    VOLC_REALTIME_END_SMOOTH_WINDOW_MS: int
-    VOLC_REALTIME_RECV_TIMEOUT: int
-    VOLC_REALTIME_BOT_NAME: str
-    VOLC_REALTIME_SYSTEM_ROLE: str
-    VOLC_REALTIME_SPEAKING_STYLE: str
-    VOLC_REALTIME_INPUT_FORMAT:str
-    VOLC_REALTIME_INPUT_SAMPLE_RATE:str
+    """千问实时语音对话配置"""
+    QWEN_REALTIME_URL: str = "wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+    QWEN_REALTIME_MODEL: str = "qwen3.5-omni-flash-realtime"
+    QWEN_REALTIME_SYSTEM_ROLE: Optional[str] = "app/prompt/interviewer-system-prompt.md"
+    QWEN_REALTIME_VOICE: str = "Ethan"
     """Embedding 模型配置"""
     EMBEDDING_PROVIDER: Optional[str] = None
     EMBEDDING_MODEL_NAME: str
